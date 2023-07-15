@@ -1,0 +1,10 @@
+# @package _global_
+dataset: streamingqa
+
+data_dir: '/iris/u/nathu/temporal-LMs/learned_updating/data/streamingqa2018+'
+train_path: '${data_dir}/train.csv'
+val_path: '${data_dir}/val.csv'
+test_path: '${data_dir}/test.csv'
+
+lt_train_path: '/iris/u/nathu/temporal-LMs/learned_updating/data/qa_pretrain/train.csv'
+lt_val_path: '/iris/u/nathu/temporal-LMs/learned_updating/data/qa_pretrain/val.csv'

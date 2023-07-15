@@ -1,0 +1,62 @@
+# @package _global_
+
+task: eval
+weight_model_path: ???
+log_dir: './'
+n_epochs: 1
+wandb_run_name: ${task}/${shorten_path:${weight_model_path}}/${shorten_path:${base_model}}_${qa_adapter}/${notes}/${seed}-${uuid:}
+
+bm_learned_layers: -1
+batch_size: 1
+generation_batch_size: 1
+grad_acc_steps: 1
+grad_checkpointing: False
+
+lr: .0001
+
+
+qa_lt_init: False
+qa_lt_intermediate: False
+qa_lt_final: False
+
+qa_eval_intermediate: False
+
+lt_lr: 2.5e-5
+lt_epochs: 0
+lt_steps: 1000000
+lt_val_steps: 16
+lt_batch_size: -1
+lt_grad_acc_steps: -1
+lt_stopping_metric: 'max_f1'
+lt_patience: 3
+
+grad_clip_thresh: 750
+downsample_to: -1
+
+lt_early_stop: True
+delete_checkpoints: True
+eval_init: False
+eval_every_k: -1
+eval_intermediate: False
+eval_every_k_post: -1
+
+bimodal_ablation: False
+low_output: 0
+high_output: 247.8135
+
+optimizer: 'adam'
+eval: [em,ppl]
+num_beams: 12
+num_beam_groups: 4
+diversity_penalty: 10.0
+notes: ''
+
+subdir: 
+hydra:
+  job:
+    chdir: true
+  run:  
+    dir: outputs/${task}/${dataset}/${model_type}-${shorten_path:${weight_model_path}}/${shorten_path:${base_model}}_${qa_adapter}/${notes}/${seed}-${uuid:}
+  sweep:
+    dir: outputs/${task}/${dataset}/${model_type}-${shorten_path:${weight_model_path}}/${shorten_path:${base_model}}_${qa_adapter}/${notes}/${seed}-${uuid:}
+    subdir: ${hydra.job.num}

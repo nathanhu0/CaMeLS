@@ -1,0 +1,34 @@
+defaults:
+  - _self_
+  - dataset: streamingqa
+  - qa_adapter: vanilla
+
+seed: 42
+model: 'distilgpt2'
+tokenizer_name: ${model}
+wandb_log: true
+wandb_project: 'learned_updating'
+wandb_run_name: '${model}_qa_pretraining_${qa_adapter}'
+
+early_stop: False
+val_steps: 512
+lt_batch_size: 32
+grad_acc_steps: 2
+train_steps: 10000000
+lr: .000025
+grad_clip_thresh: 100
+notes: ''
+qa_eos: true
+
+load_state_dict_path: null
+save_path: './'
+
+grad_checkpointing: False
+stop_k: 10
+optimizer: 'adam'
+hydra:
+  run:
+    dir: ./outputs/qa_pretraining/${dataset}/${model}-${qa_adapter}${notes}/${now:%Y-%m-%d}-${now:%H-%M-%S}
+  sweep:
+    dir: ./outputs/qa_pretraining/${dataset}/${model}-${qa_adapter}${notes}/${now:%Y-%m-%d}-${now:%H-%M-%S}
+    subdir: ''

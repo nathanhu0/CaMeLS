@@ -1,0 +1,58 @@
+# @package _global_
+
+
+
+grad_checkpointing: False
+
+notes: ''
+wandb_run_name: ${task}_${dataset}_model:${model_type}-base:${base_model}_ckl:${c_kl}_cnorm:${c_norm}_${notes}_${uuid:}
+log_dir: './'
+
+val: true
+task: 'train'
+val_em: True
+n_epochs: 50
+val_steps: 100
+save_steps: False
+outer_lr: .00001
+
+reduce_lr_on_plateau: False
+sample_weights: True
+sample_steps: ${val_steps}
+
+seed: 42
+update_batch_size: 6
+sequential_update: True
+grad_acc_steps: 4
+reset_base_freq: 24
+
+bm_learned_layers: -1
+loc_batch_size: 1
+qa_loc: False
+web_text_loc: True
+c_kl: .1
+
+norm: 2
+norm_from_one: True
+c_norm: 0
+
+
+
+log_stepwise_metrics: False
+grad_clip_thresh: 100000
+
+inner_lr: .0005
+sample_inner_lr: False
+min_inner_lr: .0001
+max_inner_lr: .001
+
+load_checkpoint_path: null
+
+hydra:
+  job:
+    chdir: true
+  run:
+    dir: outputs/${task}/${dataset}/BM_${shorten_path:${base_model}}_WM_${pretrained_model}/ckl:${c_kl}_cnorm:${c_norm}_${now:%Y-%m-%d}_${notes}_${uuid:}
+  sweep:
+    dir: outputs/${task}/${dataset}/BM_${shorten_path:${base_model}}_WM_${pretrained_model}/ckl:${c_kl}_cnorm:${c_norm}_${now:%Y-%m-%d}_${notes}_${uuid:}
+    subdir: ${hydra.job.num}

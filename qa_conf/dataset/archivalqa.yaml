@@ -1,0 +1,5 @@
+# @package _global_
+dataset: archivalqa
+
+lt_train_path: '/iris/u/nathu/temporal-LMs/learned_updating/data/archivalqa/val_data_resplit/qa_lt.csv'
+lt_val_path: '/iris/u/nathu/temporal-LMs/learned_updating/data/archivalqa/val_data_resplit/qa_lt_val.csv'

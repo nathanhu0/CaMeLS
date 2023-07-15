@@ -1,0 +1,12 @@
+
+# @package _global_
+dataset: squad
+
+qa_lt_split: train
+qa_lt_start_idx: 0
+qa_lt_end_idx: 40006
+
+qa_lt_val_split: train
+qa_lt_val_start_idx: 40006
+qa_lt_val_end_idx: 42118
+

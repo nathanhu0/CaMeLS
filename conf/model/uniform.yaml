@@ -1,0 +1,4 @@
+# @package _global_
+model_type: 'uniform'
+num_inner_steps: 1
+init_scalar: 1

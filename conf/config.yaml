@@ -1,0 +1,19 @@
+wandb_log: true
+wandb_project: 'learned_updating'
+
+defaults:
+  - _self_
+  - model: ???
+  - task: ???
+  - dataset: streamingqa
+  - qa_adapter: vanilla
+
+
+seed: 42
+resume: False
+debug: True
+early_stop: False
+
+base_model: 'distilgpt2'
+tokenizer_name: 'gpt2'
+base_model_state_dict: null
