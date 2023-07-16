@@ -9,7 +9,7 @@ We conduct experiments using three datasets:
 
 # QA model pretraining
 
-The question-answering trained language models used for CaMeLS meta-training and online-adaptation evaluation can be found at TODO. The `train_qa.py` file can be used to retrain these models starting from pretrained model checkpoints on hugginface. ie
+The question-answering trained language models used for CaMeLS meta-training and online-adaptation evaluation can be found at TODO. The `train_qa.py` file can be used to retrain these models starting from pretrained model checkpoints on huggingface. ie
 `python train_qa.py dataset=squad model=gpt2-xl`
 
 # CaMeLS metatraining
