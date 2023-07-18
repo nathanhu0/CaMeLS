@@ -7,7 +7,6 @@ from transformers import AutoModelForCausalLM
 import string
 import re
 import warnings
-import GPUtil
 import getpass
 import os
 
@@ -16,21 +15,13 @@ import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw, ImageFont
 from typing import List
 from collections import Counter
+# %%
+
 
 warnings.filterwarnings("ignore", message="UserWarning: Passing `max_length` to BeamSearchScorer is deprecated and has no effect. `max_length` should be passed directly to `beam_search(...)")
 
-
-if os.path.exists('/scr-ssd'):
-    CACHE_DIR = '/scr-ssd/' + getpass.getuser()
-elif os.path.exists('/scr/scr-with-most-space'):
-    CACHE_DIR = '/scr/scr-with-most-space/' + getpass.getuser()
-else:
-    CACHE_DIR = '/scr/' + getpass.getuser()
-#CACHE_DIR=f'/iris/u/{getpass.getuser()}/cache/'
-if not os.path.exists(CACHE_DIR):
-    print('making cache_dir:', CACHE_DIR)
-    os.makedirs(CACHE_DIR, exist_ok = True)
- 
+#change this to your cache dir
+CACHE_DIR = '/Users/nathan_hu/CaMeLS/CaMeLS/.cache'
 
 def get_most_frequent_item(lst):
     counter = Counter(lst)
@@ -96,11 +87,9 @@ def debug_memory(message = ''):
     print('Memory Usage:')
     print('Allocated:', round(torch.cuda.memory_allocated(0)/1024**3,1), 'GB')
     print('Cached:   ', round(torch.cuda.memory_cached(0)/1024**3,1), 'GB')
-    print(print(GPUtil.showUtilization()))
     
-#lol this is funny, this code i took from ckl, removed the t5 stuff, and now its ecavtly the code in the squad codebase
+
 def normalize_answer(s):
-    #this is frankenstien code from ckl, some of the cleaning is not needed since we arent working w t5
     """Lower text and remove punctuation, articles and extra whitespace."""
 
     def remove_articles(text):
@@ -152,7 +141,6 @@ def weighted_lm_loss(model, input_ids, target_ids, attention_mask, weights):
     l = loss_fn(reshaped_logits, reshaped_labels)
     return (l.reshape(batch_size, -1)*weights[:, 1:]).mean()
 
-#from ckl
 def set_seed(seed):
     random.seed(seed)
     np.random.seed(int(seed))
@@ -210,96 +198,7 @@ def generation_matches(model: AutoModelForCausalLM, batch, tokenizer, top_k = 1,
         em_correct += em
     return em_correct/len(batch['gen_q_ids']) if frac else em_correct
 
-def generate_fast(model, tok, prompts, n_gen_per_prompt = 1, top_k = 5, max_out_len = 50):
-    """
-    FROM ROME 
-    Fast, parallelized auto-regressive text generation with top-k sampling.
-    Our custom implementation.
-        model: AutoModelForCausalLM,
-        tok: AutoTokenizer,
-        prompts: List[str],
-        n_gen_per_prompt: int = 1,
-        top_k: int = 5,
-        max_out_len: int = 50,
-    """
 
-    # Unroll prompts and tokenize
-    inp = [prompt for prompt in prompts for _ in range(n_gen_per_prompt)]
-    inp_tok = tok(inp, padding=True, return_tensors="pt").to(
-        next(model.parameters()).device
-    )
-    input_ids, attention_mask = inp_tok["input_ids"], inp_tok["attention_mask"]
-    batch_size = input_ids.size(0)
-
-    # Setup storage of fast generation with attention caches.
-    # `cur_context` is used to define the range of inputs that are not yet
-    # stored in `past_key_values`. At each step, we are generating the
-    # next token for the index at `cur_context.stop + 1`.
-    past_key_values, cur_context = None, slice(0, attention_mask.sum(1).min().item())
-
-    with torch.no_grad():
-        while input_ids.size(1) < max_out_len:  # while not exceeding max output length
-            model_out = model(
-                input_ids=input_ids[:, cur_context],
-                attention_mask=attention_mask[:, cur_context],
-                past_key_values=past_key_values,
-                use_cache=True,
-            )
-            logits, past_key_values = model_out.logits, model_out.past_key_values
-            softmax_out = torch.nn.functional.softmax(logits[:, -1, :], dim=1)
-
-            # Top-k sampling
-            tk = torch.topk(softmax_out, top_k, dim=1).indices
-            softmax_out_top_k = torch.gather(softmax_out, 1, tk)
-            softmax_out_top_k = softmax_out_top_k / softmax_out_top_k.sum(1)[:, None]
-            new_tok_indices = torch.multinomial(softmax_out_top_k, 1)
-            new_toks = torch.gather(tk, 1, new_tok_indices)
-
-            # If we're currently generating the continuation for the last token in `input_ids`,
-            # create a new index so we can insert the new token
-            if cur_context.stop == input_ids.size(1):
-                attention_mask = torch.cat(
-                    [attention_mask, attention_mask.new_zeros(batch_size, 1)], dim=1
-                )
-                input_ids = torch.cat(
-                    [
-                        input_ids,
-                        input_ids.new_ones(batch_size, 1) * tok.pad_token_id,
-                    ],
-                    dim=1,
-                )
-
-            last_non_masked = attention_mask.sum(1) - 1
-            for i in range(batch_size):
-                new_idx = last_non_masked[i] + 1
-                if last_non_masked[i].item() + 1 != cur_context.stop:
-                    continue
-
-                # Stop generating if we've already maxed out for this prompt
-                if new_idx < max_out_len:
-                    input_ids[i][new_idx] = new_toks[i]
-                    attention_mask[i][new_idx] = 1
-
-            cur_context = slice(cur_context.stop, cur_context.stop + 1)
-
-    txt = [tok.decode(x) for x in input_ids.detach().cpu().numpy().tolist()]
-    """
-    txt = [
-        unicodedata.normalize("NFKD", x)
-        .replace("\n\n", " ")
-        .replace("<|endoftext|>", "")
-        for x in txt
-    ]"""
-
-    return txt
-
-
-
-
-# %%
-import matplotlib.pyplot as plt
-from PIL import Image, ImageDraw, ImageFont
-from typing import List
 
 
 def create_colored_text(words: List[str], data: List[float], font_path='DejaVuSansMono.ttf', pos_cmap=None, neg_cmap=None, max_intensity=.8) -> Image:

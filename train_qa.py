@@ -1,6 +1,6 @@
 #%%
 import os
-from transformers import GPT2LMHeadModel, GPT2TokenizerFast, GPTNeoForCausalLM,AutoModelForCausalLM, AutoTokenizer
+from transformers import GPT2TokenizerFast, AutoModelForCausalLM, AutoTokenizer
 from torch.utils.data import DataLoader
 from exp_datasets import StreamingQADataset, SquadDataset, ArchivalQADataset, RACEDataset
 from util import set_seed, decode_to_clean_text, exact_match, clean_up
@@ -8,12 +8,9 @@ import hydra
 import wandb
 import torch
 from tqdm import tqdm
-from omegaconf import OmegaConf
 import numpy as np
 from util import CACHE_DIR
-from prompt_tuned_gpt import promptedGPT2Model
 from subroutines import qa_light_tune_early_stop
-from peft import get_peft_model, PrefixTuningConfig, TaskType
 #%%
 @hydra.main(config_path='qa_conf', config_name='config')
 def run(args):
@@ -45,23 +42,16 @@ def run(args):
         print("Enabling Gradient checkpointing")
         base_lm.transformer.gradient_checkpointing = True
     
-    if args.qa_adapter == 'prefix_tuning':
-        peft_config = PrefixTuningConfig(
-                    task_type=TaskType.CAUSAL_LM,
-                    num_virtual_tokens=args.num_virtual_tokens,
-                )
-        model = get_peft_model(base_lm, peft_config)
-    else:
-        model = base_lm
+    base_lm = base_lm
     
     if args.load_state_dict_path is not None:
         print('loading state dict')
         state_dict = torch.load(args.load_state_dict_path, map_location=device)
-        model.load_state_dict(state_dict)
-    model.to(device)
+        base_lm.load_state_dict(state_dict)
+    base_lm.to(device)
     
     
-    qa_light_tune_early_stop(train_dataloader, val_dataloader, save_path=args.save_path, max_steps=args.train_steps, val_steps=args.val_steps, lr=args.lr, device=device, model = model, include_question = False, grad_accumulation_steps = args.grad_acc_steps, resume=False, optimizer = args.optimizer, stopping_metric = 'nll', stop_k = args.stop_k, seed = 42, debug=False, early_stop = args.early_stop, wandb_log=True, grad_clip_thresh = args.grad_clip_thresh, save_best_metrics=['exact_match', 'nll', 'max_f1'])
+    qa_light_tune_early_stop(train_dataloader, val_dataloader, save_path=args.save_path, max_steps=args.train_steps, val_steps=args.val_steps, lr=args.lr, device=device, model = base_lm, include_question = False, grad_accumulation_steps = args.grad_acc_steps, resume=False, optimizer = args.optimizer, stopping_metric = 'nll', stop_k = args.stop_k, seed = 42, debug=False, early_stop = args.early_stop, wandb_log=True, grad_clip_thresh = args.grad_clip_thresh, save_best_metrics=['exact_match', 'nll', 'max_f1'])
     wandb.finish()
 
 

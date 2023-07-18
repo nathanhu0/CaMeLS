@@ -1,13 +1,13 @@
 defaults:
   - _self_
   - dataset: streamingqa
-  - qa_adapter: vanilla
 
+qa_adapter: vanilla
 seed: 42
 model: 'distilgpt2'
 tokenizer_name: ${model}
 wandb_log: true
-wandb_project: 'learned_updating'
+wandb_project: 'CaMeLS'
 wandb_run_name: '${model}_qa_pretraining_${qa_adapter}'
 
 early_stop: False
@@ -28,7 +28,7 @@ stop_k: 10
 optimizer: 'adam'
 hydra:
   run:
-    dir: ./outputs/qa_pretraining/${dataset}/${model}-${qa_adapter}${notes}/${now:%Y-%m-%d}-${now:%H-%M-%S}
+    dir: ./outputs/qa_pretraining/${dataset}/${model}_${notes}/${now:%Y-%m-%d}-${now:%H-%M-%S}
   sweep:
-    dir: ./outputs/qa_pretraining/${dataset}/${model}-${qa_adapter}${notes}/${now:%Y-%m-%d}-${now:%H-%M-%S}
+    dir: ./outputs/qa_pretraining/${dataset}/${model}_${notes}/${now:%Y-%m-%d}-${now:%H-%M-%S}
     subdir: ''

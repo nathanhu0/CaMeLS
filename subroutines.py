@@ -1,9 +1,8 @@
 #%%
-from logging import raiseExceptions
 from transformers import Adafactor, GPT2LMHeadModel, GPT2TokenizerFast, AutoModelForCausalLM, AutoTokenizer
 from exp_datasets import StreamingQADataset
 import torch
-from tqdm.auto import tqdm
+from tqdm import tqdm
 from util import weighted_lm_loss, decode_to_clean_text, exact_match, clean_up, CACHE_DIR, set_seed, debug_memory, f1_score
 import numpy as np
 from copy import deepcopy
@@ -14,7 +13,6 @@ import os
 from collections import defaultdict
 import wandb
 import traceback
-from peft import peft_model
 
 #%%
 def gen_save(model, path):
@@ -190,10 +188,7 @@ def qa_light_tune_early_stop(train_dataloader, val_dataloader, save_path, max_st
     if debug:
         debug_memory('post optional model load') 
     
-    if isinstance(model, peft_model.PeftModelForCausalLM):
-        model.eval()
-    else:
-        model.train()
+    model.train()
         
     cur_steps = 0
     tokenizer = AutoTokenizer.from_pretrained('gpt2', cache_dir = CACHE_DIR)
@@ -235,8 +230,7 @@ def qa_light_tune_early_stop(train_dataloader, val_dataloader, save_path, max_st
                     debug_memory('start of val')
                 model.eval()
                 val_metrics = validate(model, tokenizer, val_dataloader, greedy = True)
-                if not isinstance(model, peft_model.PeftModelForCausalLM):
-                    model.train()
+                model.train()
                 light_tune_metrics['steps'].append(cur_steps)
                 for k, v in val_metrics.items():
                     light_tune_metrics[k].append(v)
