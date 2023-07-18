@@ -1,7 +1,7 @@
 # @package _global_
 dataset: archivalqa
 
-data_dir: '/iris/u/nathu/temporal-LMs/learned_updating/data/archivalqa/val_data_resplit'
+data_dir: 'absolute/path/to/archivalqa_data_dir'
 train_path: '${data_dir}/train.csv'
 val_path: '${data_dir}/val.csv'
 test_path: '${data_dir}/test.csv'
