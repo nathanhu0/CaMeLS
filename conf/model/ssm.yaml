@@ -1,2 +1,3 @@
 # @package _global_
 model_type: 'ssm'
+weight_model_path: 'SSM'

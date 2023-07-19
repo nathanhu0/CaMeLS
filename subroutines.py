@@ -176,7 +176,7 @@ def qa_light_tune_early_stop(train_dataloader, val_dataloader, save_path, max_st
     Returns:
         _type_: _description_
     """
-    save_path = save_path+ '_early_stop'
+    save_path = save_path+ 'checkpoints'
     os.makedirs(save_path, exist_ok=True)
     if debug:
         debug_memory('start qa_light_tune_early_stop') 
@@ -353,7 +353,6 @@ def weighted_train(weight_model, dataloader, n_epochs, lr, base_lm, save_dir, gr
             torch.save(base_lm.state_dict(), os.path.join(save_dir,f'ft-{i_epoch}.pt'))
     if debug:
         debug_memory('finished weighted_train')
-    print('ending optimizer state dict:', get_opt_hash(optimizer))
     return base_lm, optimizer
 
 def qa_ppl_eval(dataloader, log_path, model = None, load_path = None, device = 'cuda'):

@@ -21,7 +21,8 @@ from collections import Counter
 warnings.filterwarnings("ignore", message="UserWarning: Passing `max_length` to BeamSearchScorer is deprecated and has no effect. `max_length` should be passed directly to `beam_search(...)")
 
 #change this to your cache dir
-CACHE_DIR = '/Users/nathan_hu/CaMeLS/CaMeLS/.cache'
+
+CACHE_DIR = '/iris/u/nathu/CaMEL/cache'
 
 def get_most_frequent_item(lst):
     counter = Counter(lst)

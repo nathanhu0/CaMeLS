@@ -21,8 +21,8 @@ sample_weights: True
 sample_steps: ${val_steps}
 
 seed: 42
-update_batch_size: 6
-sequential_update: True
+update_batch_size: 6 
+sequential_update: True #when true, the inner model is updated sequentially, otherwise a single batch update is performed
 grad_acc_steps: 4
 reset_base_freq: 24
 
@@ -30,18 +30,21 @@ bm_learned_layers: -1
 loc_batch_size: 1
 qa_loc: False
 web_text_loc: True
+web_text_csv:  '/iris/u/nathu/temporal-LMs/learned_updating/data/open_web_text/10k.csv' #edit this to point to the csv file containing the web text data
 c_kl: .1
 
+#earlier experiments included a norm penality on learned importance weights, but this is no longer used (c_norm: 0)
+c_norm: 0
 norm: 2
 norm_from_one: True
-c_norm: 0
-
 
 
 log_stepwise_metrics: False
-grad_clip_thresh: 100000
+grad_clip_thresh: 1e9 
 
 inner_lr: .0005
+
+#unused feature to vary to inner learning rate
 sample_inner_lr: False
 min_inner_lr: .0001
 max_inner_lr: .001
@@ -52,7 +55,7 @@ hydra:
   job:
     chdir: true
   run:
-    dir: outputs/${task}/${dataset}/BM_${shorten_path:${base_model}}_WM_${pretrained_model}/ckl:${c_kl}_cnorm:${c_norm}_${now:%Y-%m-%d}_${notes}_${uuid:}
+    dir: outputs/${task}/${dataset}/${now:%Y-%m-%d}_${notes}_${uuid:}
   sweep:
-    dir: outputs/${task}/${dataset}/BM_${shorten_path:${base_model}}_WM_${pretrained_model}/ckl:${c_kl}_cnorm:${c_norm}_${now:%Y-%m-%d}_${notes}_${uuid:}
+    dir: outputs/${task}/${dataset}/${now:%Y-%m-%d}_${notes}_${uuid:}
     subdir: ${hydra.job.num}

@@ -2,5 +2,6 @@
 # @package _global_
 dataset: streamingqa
 
-lt_train_path: '/iris/u/nathu/temporal-LMs/learned_updating/data/qa_pretrain/train.csv'
-lt_val_path: '/iris/u/nathu/temporal-LMs/learned_updating/data/qa_pretrain/val.csv'
+#update these paths to point to the data location on your local machine
+lt_train_path: '/iris/u/nathu/temporal-LMs/learned_updating/data/streamingqa/qa_train.csv'
+lt_val_path: '/iris/u/nathu/temporal-LMs/learned_updating/data/streamingqa/qa_val.csv'

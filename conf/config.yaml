@@ -8,7 +8,6 @@ defaults:
   - dataset: streamingqa
   - qa_adapter: vanilla
 
-
 seed: 42
 resume: False
 debug: True

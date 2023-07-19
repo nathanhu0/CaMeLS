@@ -4,7 +4,7 @@ from regex import I
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from torch.utils.data import DataLoader
 from exp_datasets import StreamingQADataset, WebTextDataset, SquadDataset, ArchivalQADataset, RangeSampler, RACEDataset
-from weight_model import    CAMeLWeightModel, FcWeightModel, CachedWeightModel, UniformWeightModel, POSWeightModel, BimodalAblation, EntropyThreshold, SSM
+from weight_model import CaMeLSWeightModel, UniformWeightModel, SSM
 from util import set_seed, CACHE_DIR, debug_memory
 import csv
 from subroutines import qa_eval, weighted_train, qa_ppl_eval, qa_light_tune_early_stop, get_optimizer
@@ -26,7 +26,7 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 def get_weight_model(args):
     if args.model_type == 'CaMeLS':
-        return FcWeightModel(args, device_=DEVICE)
+        return CaMeLSWeightModel(args, device_=DEVICE)
     elif args.model_type == 'uniform':
         return UniformWeightModel(args, device_=DEVICE)
     elif args.model_type == 'ssm':
@@ -131,7 +131,7 @@ def train(args):
             val_loc_dataloaders['qa'] = qa_loc_val_dataloader
             loc_iters['qa'] = iter(qa_loc_dataloader)
         if args.web_text_loc:
-            web_loc_dataloader = DataLoader(WebTextDataset(loc = True, tokenizer=tokenizer), batch_size=args.loc_batch_size,shuffle=True, drop_last = True)
+            web_loc_dataloader = DataLoader(WebTextDataset(csv_path=args.webtext_path, loc = True, tokenizer=tokenizer), batch_size=args.loc_batch_size,shuffle=True, drop_last = True)
             val_web_loc_dataloader = DataLoader(WebTextDataset(loc = True, tokenizer=tokenizer), batch_size=args.loc_batch_size,shuffle=False, drop_last = True)
             loc_dataloaders['open_web_text'] = web_loc_dataloader
             val_loc_dataloaders['open_web_text'] = val_web_loc_dataloader
@@ -144,8 +144,7 @@ def train(args):
     if args.load_checkpoint_path is not None:
         weight_model.load(target_path = args.load_checkpoint_path)
     
-    best_val_metrics = {'[AGG]total_loss':1e9, '[AGG]qa_gain':0}
-    
+    best_val_loss = 1e9
     original_inner_lr = args.inner_lr
     if args.sample_inner_lr:
         cur_inner_lr = np.random.uniform(args.min_inner_lr, args.max_inner_lr)
@@ -180,12 +179,10 @@ def train(args):
                 weight_model.set_inner_lr(cur_inner_lr)
                 weight_model.train()
                 if args.wandb_log: wandb.log({'val': val_metrics}, commit = False)
-                if val_metrics['[AGG]total_loss'] < best_val_metrics['[AGG]total_loss']:
-                    best_val_metrics['[AGG]total_loss'] = val_metrics['[AGG]total_loss']
+                if val_metrics['[AGG]total_loss'] < best_val_loss:
+                    best_val_loss = val_metrics['[AGG]total_loss']
                     weight_model.save(i_epoch, i_step, file_name = f'best_val_loss-{i_epoch}-{i_step}.pt')
-                if val_metrics['[AGG]qa_gain'] > best_val_metrics['[AGG]qa_gain']:
-                    best_val_metrics['[AGG]qa_gain'] = val_metrics['[AGG]qa_gain']
-                    weight_model.save(i_epoch, i_step, file_name = f'best_qa_gain-{i_epoch}-{i_step}.pt')
+
                 if args.reduce_lr_on_plateau:
                     scheduler.step(val_metrics['[AGG]total_loss'])
                 if args.wandb_log: wandb.log({'outer_lr': w_optimizer.param_groups[0]['lr']}, commit = False)
@@ -355,21 +352,18 @@ def evaluate(args):
         if args.model_type == 'CaMeLS':
             weight_model.load(target_path = to_absolute_path(args.weight_model_path))
         weight_model.eval()
-        if args.bimodal_ablation:
-            weight_model = BimodalAblation(orig_weight_model = weight_model, low_output = args.low_output, high_output=args.high_output)
         
         optimizer_state_dict = None
         for i, wt_dataloader in enumerate(weighted_train_dataloaders):
         #base_lm will be modified in place
             base_lm.requires_grad_(True)
             base_lm.train()
-            print('model hash pre:', base_lm.state_dict()['transformer.wte.weight'].sum(), base_lm.state_dict()['transformer.h.0.ln_1.weight'].sum())
             if args.eval_every_k_post != -1:
                 os.makedirs(os.path.join(args.log_dir, 'ft'), exist_ok=True)
                 base_lm, optimizer_state_dict = weighted_train(weight_model, wt_dataloader, args.n_epochs, args.lr, base_lm, save_dir = os.path.join(args.log_dir, 'ft'), grad_accumulation_steps=args.grad_acc_steps, resume = args.resume, optimizer = args.optimizer, seed = args.seed, debug = args.debug, wandb_log=args.wandb_log, grad_clip_thresh=args.grad_clip_thresh, optimizer_state_dict = optimizer_state_dict, save_steps=args.eval_every_k_post)
             else:
                 base_lm, optimizer_state_dict = weighted_train(weight_model, wt_dataloader, args.n_epochs, args.lr, base_lm, save_dir = os.path.join(args.log_dir, 'ft'), grad_accumulation_steps=args.grad_acc_steps, resume = args.resume, optimizer = args.optimizer, seed = args.seed, debug = args.debug, wandb_log=args.wandb_log, grad_clip_thresh=args.grad_clip_thresh, optimizer_state_dict = optimizer_state_dict)
-            print('model hash post:', base_lm.state_dict()['transformer.wte.weight'].sum(), base_lm.state_dict()['transformer.h.0.ln_1.weight'].sum())
+    
             if args.qa_lt_intermediate:
                 
                 k_updates = (i+1)*args.eval_every_k

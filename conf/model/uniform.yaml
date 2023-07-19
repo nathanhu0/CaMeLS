@@ -1,4 +1,5 @@
 # @package _global_
 model_type: 'uniform'
+weight_model_path: 'uniform'
 num_inner_steps: 1
 init_scalar: 1

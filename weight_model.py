@@ -32,7 +32,7 @@ default_config = OmegaConf.create({
     'norm_from_one': True
     })
 
-class CAMeLWeightModel(nn.Module):
+class WeightingModel(nn.Module):
     def __init__(self, config=default_config,
                  device_ = 'cuda'):
         #if base_lm, we do not load a base_lm
@@ -254,7 +254,7 @@ class CAMeLWeightModel(nn.Module):
         plt.subplots_adjust(hspace=1)
         plt.savefig(save_path,  facecolor = 'white')
     
-class FcWeightModel(CAMeLWeightModel):
+class CaMeLSWeightModel(WeightingModel):
     def __init__(self, config=default_config, device_ = None):
         if device_  is None:
             device_ = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -315,7 +315,7 @@ class FcWeightModel(CAMeLWeightModel):
             x = x/(x.sum(1).unsqueeze(1)) * (attention_mask.sum(1).unsqueeze(1)) 
         return x
 
-class UniformWeightModel(CAMeLWeightModel):
+class UniformWeightModel(WeightingModel):
     def __init__(self, config=default_config, device_=None):
         if device_  is None:
             device_ = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -338,7 +338,7 @@ class UniformWeightModel(CAMeLWeightModel):
     def forward(self, x=None, attention_mask = None, idx=None):
         return self.scalar*attention_mask
     
-class SSM(CAMeLWeightModel):
+class SSM(WeightingModel):
     def __init__(self, tokenizer='gpt2', device_=None, entities_to_ignore=['TIME', 'PERCENT', 'MONEY', 'QUANTITY', 'ORDINAL', 'CARDINAL']):
         self.nlp = spacy.load("en_core_web_sm")
         super().__init__(device_=device_)

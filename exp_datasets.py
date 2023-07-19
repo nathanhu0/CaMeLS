@@ -251,7 +251,7 @@ class ArchivalQADataset(TextAndQuestionDataset):
         return new_squad_ds
 
 class WebTextDataset(Dataset):
-    def __init__(self, csv_path = '/iris/u/nathu/temporal-LMs/learned_updating/data/open_web_text/10k.csv', 
+    def __init__(self, csv_path, 
                  max_text_len = 1024, device_ = None, loc = False, tokenizer='gpt2'):
         self.csv_path = csv_path
         self.device = device_ if device_ is not None else ('cuda' if torch.cuda.is_available() else 'cpu')

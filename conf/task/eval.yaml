@@ -45,7 +45,7 @@ low_output: 0
 high_output: 247.8135
 
 optimizer: 'adam'
-eval: [em,ppl]
+eval: [em] #a list containing em, emK for integer K for top K evaluation, or 'ppl' to compute average answer token ppl/nll
 num_beams: 12
 num_beam_groups: 4
 diversity_penalty: 10.0
@@ -56,7 +56,7 @@ hydra:
   job:
     chdir: true
   run:  
-    dir: outputs/${task}/${dataset}/${model_type}-${shorten_path:${weight_model_path}}/${shorten_path:${base_model}}_${qa_adapter}/${notes}/${seed}-${uuid:}
+    dir: outputs/${task}/${dataset}/${model_type}-${shorten_path:${weight_model_path}}/${shorten_path:${base_model}}_${qa_adapter}/${notes}-${seed}-${uuid:}
   sweep:
-    dir: outputs/${task}/${dataset}/${model_type}-${shorten_path:${weight_model_path}}/${shorten_path:${base_model}}_${qa_adapter}/${notes}/${seed}-${uuid:}
+    dir: outputs/${task}/${dataset}/${model_type}-${shorten_path:${weight_model_path}}/${shorten_path:${base_model}}_${qa_adapter}/${notes}-${seed}-${uuid:}
     subdir: ${hydra.job.num}
