@@ -40,13 +40,13 @@ we can also load a base model from a state dict.
 
 `python run.py task=train model=CaMeLS dataset=archivalqa base_model=distilgpt2 base_model_state_dict=/qa_tuned/distilgpt2/state_dict.pt`
 
-## online adaptation evaluation
+## Online Adaptation Evaluation
 
 Arguments: 
 
-  **model**- the weighting model/strategy to use. either 'uniform', 'ssm', or 'fc', corresponding to unfiorm fine tuning, fine tuning only on words in salient spance, and CaMeLs
+  **model**- the weighting model/strategy to use. either 'uniform', 'ssm', or 'CaMeLS', corresponding to unfiorm fine tuning, fine tuning only on words in salient spance, and CaMeLs
   
-  **dataset** - the dataset used. By default, evaluations will run using the test split (specified on a per-dataset basis in conf/dataset). To run evaluations on the validation set, overwrite the correpsonding parameters. 
+  **dataset** - the dataset used. By default, evaluations will run using the test split (specified on a per-dataset basis in conf/dataset). To run evaluations on the validation set, overwrite the corresponding (dataset dependent) parameters. 
   
   **downsample_to** - for evaluation, we typically consider many streams of documents sampled from the test split. downsample_to = k corresponds to sampling k documents form the test set
   
