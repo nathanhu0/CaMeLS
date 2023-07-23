@@ -37,8 +37,8 @@ def get_weight_model(args):
 def get_base_model(args):   
     base_lm = AutoModelForCausalLM.from_pretrained(args.base_model, cache_dir = CACHE_DIR).to(DEVICE)
     
-    if args.base_model_state_dict is not None:
-        base_lm.load_state_dict(torch.load(args.base_model_state_dict, map_location=base_lm.device))
+    if args.base_model_state_dict_path is not None:
+        base_lm.load_state_dict(torch.load(args.base_model_state_dict_path, map_location=base_lm.device))
     base_lm.train()
     
     #if free all base model layers except embedding/lm head
