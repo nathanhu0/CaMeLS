@@ -15,4 +15,4 @@ early_stop: False
 
 base_model: 'distilgpt2'
 tokenizer_name: 'gpt2'
-base_model_state_dict: null
+base_model_state_dict_path: null
