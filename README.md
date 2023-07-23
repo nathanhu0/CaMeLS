@@ -7,38 +7,51 @@ This repo includes a reference implementation of the CaMeLS metalearning approac
 
 The files in this repo are:
 
-- `run.py`: main function to be called for both training of CaMeLS and evaluation of online adaptaiton. 
-- `weight_model.py` - the core implementation of a CaMeLS weight model (fcweightmodel) and other weight 
-- `train_qa.py` - to be run to fine tune LMs for QA on a given dataset
-- `util.py` - various helper functions
+- `run.py`: main function to be called for both training of CaMeLS and evaluation of online adaptaiton.
+- `weight_model.py` - the core implementation of a CaMeLS weight model and baseline loss weighting strategies.
+- `train_qa.py` - script to fine tune language models for question-answering on a given dataset.
+- `util.py` - various helper functions.
 - `exp_datasets`: datasets classes surrounding document-question pairs. 
-- `subroutines.py`: definition of subroutines for QA fine-tuning and top_k evaluation
+- `subroutines.py`: definition of subroutines for QA tuning and top_k evaluation.
 
 
 ## Datasets
 We conduct experiments using three datasets:
 
-**[StreamingQA:](https://github.com/deepmind/streamingqa)** to use, first download the csvs files [here](https://drive.google.com/drive/folders/1Xod97TmnjmbGDiyOHfuEUZ14tSL3qA-X?usp=drive_link). CSV files contain the subset of the StreamingQA dataset we use for our experiements. 
+**[StreamingQA:](https://github.com/deepmind/streamingqa)** The CSV files containing the subset of the StreamingQA dataset we use for our experiements can be downloaded [here](https://drive.google.com/drive/folders/1Xod97TmnjmbGDiyOHfuEUZ14tSL3qA-X?usp=drive_link).
 
-**SQuAD:** directly uses the huggingface dataset class and does not require additional file to be downloaded
+**SQuAD:** We directly uses the huggingface dataset class and do not require additional files to be manually downloaded.
 
-**ArchivalQA:** the quesiton-article pairings can be referated by running the ArchivalQA_processing.ipynb notebook using the [ArchivalQA questions](https://drive.google.com/drive/u/0/folders/15JMtkJAqtZsKr_P-0jH4iFy2EOri4GbR) and the [NYT corpus](https://catalog.ldc.upenn.edu/LDC2008T19).
+**ArchivalQA:** The quesiton-article pairings can be recrated by running the ArchivalQA_processing.ipynb notebook using the [ArchivalQA questions](https://drive.google.com/drive/u/0/folders/15JMtkJAqtZsKr_P-0jH4iFy2EOri4GbR) and the [NYT corpus](https://catalog.ldc.upenn.edu/LDC2008T19).
 
-**OpenWebText:** we additionally used a small sample of open webtext to enfore local updates during CaMeLS meta training. It can be downloaded [from the same link as above](https://drive.google.com/drive/folders/1Xod97TmnjmbGDiyOHfuEUZ14tSL3qA-X?usp=drive_link).
+**OpenWebText:** we additionally used a small sample of open webtext to enfore local updates during CaMeLS meta training. It can be downloaded [here](https://drive.google.com/drive/folders/1Xod97TmnjmbGDiyOHfuEUZ14tSL3qA-X?usp=drive_link).
 
 ## QA model pretraining
 
-The question-answering trained language models used for CaMeLS meta-training and online-adaptation evaluation are first pretrained on thier respective datasets using `train_qa.py` ie
+The language models trained for question-answering are used for CaMeLS meta-training and online-adaptation evaluation. Running `train_qa.py` will load a pretrained language model from Huggingface and fine tune that model for question-answering on a dataset. For example:
 `python train_qa.py dataset=squad model=gpt2-xl`
+
+Key `train_qa.py` arguments:
+- `dataset`: the dataset to fine tune on. One of `archivalqa`, `squad`, `streamingqa`.  
+- `model`: the pretrained language model to load fron huggingface. Valid values include: `gpt2-xl`, `EleutherAI/gpt-neo-1.3b`
+, or `EleutherAI/gpt-j-6b`.
+
 
 ## CaMeLS metatraining
 
+Running `run.py` with `task=train` lets us train CaMeLS weighting models.
+
 To train a CaMeLS weighting model using a base model saved as a checkpoint via `save_pretrained`:
-`python run.py task=train model=CaMeLS dataset=archivalqa base_model=PATH_TO_QA_PROXY_MODEL.ckpt`
+```python run.py task=train model=CaMeLS dataset=archivalqa base_model=PATH_TO_QA_PROXY_MODEL.ckpt```.
 
-we can also load a base model from a state dict. 
+We can also load a base model from a state dictionary. 
+```python run.py task=train model=CaMeLS dataset=archivalqa base_model=distilgpt2 base_model_state_dict=/qa_tuned/distilgpt2/state_dict.pt```
 
-`python run.py task=train model=CaMeLS dataset=archivalqa base_model=distilgpt2 base_model_state_dict=/qa_tuned/distilgpt2/state_dict.pt`
+Key `run.py task=train` arguments:
+- `model`: Weight model configuration. should be set to `model=CaMeLS` for all meta-training runs.
+- `dataset`: dataset to meta-train on.
+- `base_model`: used to specifiy the base language model updated during the inner step of optimization. To be passed as the `pretrained_model_name_or_path` argument of `AutoModelForCausalLM.from_pretrained()`.
+- `base_model_state_dict_path`: We can set the base model parameters by loading a state dictionary from the specified path. 
 
 ## Online Adaptation Evaluation
 
