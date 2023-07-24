@@ -1,7 +1,7 @@
 # @package _global_
 
 task: eval
-weight_model_path: ${model}
+weight_model_path: ${model_type}
 log_dir: './'
 n_epochs: 1
 wandb_run_name: ${task}/${shorten_path:${weight_model_path}}/${shorten_path:${base_model}}_${qa_adapter}/${notes}/${seed}-${uuid:}
