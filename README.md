@@ -122,7 +122,7 @@ And for only fine tuning on salient spans (first line only needs to be run the f
     python -m spacy download en_core_web_sm
     python run.py task=eval model=ssm dataset=streamingqa base_model=gpt2-xl base_model_state_dict={ABSOLUTE_PATH_TO_GPT2XL_STATE_DICT} downsample_to=1665 lr=2.5e-5
 
-The model generations, per question F1 and EM values, and average F1 and EM scores are generated in the output csv file.
+The model generations, per question F1 and EM values, and average F1 and EM scores are generated in an output csv file.
 ## Citing CaMeLS
 If CaMeLS or this repository is useful in your own research, you can use the following BibTeX entry:
 
