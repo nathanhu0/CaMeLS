@@ -42,33 +42,38 @@ Key `train_qa.py` arguments:
 Depending on the value of the `task` argument, `run.py` is used for both training of CaMeLS and evaluation of CaMeLS and baseline online adaptation methods. In both settings, the following common arguments are used:
 
 Key `run.py` arguments:
-- `model`: Weight model configuration corresponding to the loss weighting strategy. During evaluation, can be set to `uniform`, `ssm`, or `CaMeLS` corresponding to token less scaling methods. Should be set to `model=CaMeLS` for all meta-training runs.
+- `model`: Weight model configuration corresponding to the loss weighting strategy. During evaluation, can be set to `uniform` (standard fine tuning), `ssm` (fine tuning on salient spans), or `CaMeLS`. Should be set to `model=CaMeLS` for all meta-training runs.
 - `dataset`: dataset used for the given task.
-- `base_model`: used to specifiy the base language model. To be passed as the `pretrained_model_name_or_path` argument of `AutoModelForCausalLM.from_pretrained()`. During training, the base model updated during the inner step of optimization. During evaluation, the base model is updated on a stream of documents then evaluated question answering.
-- `base_model_state_dict_path`: We can set the base model parameters by loading a state dictionary from the specified path. 
-
+- `base_model`: used to specifiy the base language model. To be passed as the `pretrained_model_name_or_path` argument of `AutoModelForCausalLM.from_pretrained()`. During training, the base model updated during the inner step of optimization. During evaluation, the base model is updated on a stream of documents then evaluated on question answering.
+- `base_model_state_dict_path`: If not `None`, we set the base model parameters by loading a state dictionary from the specified path.
 
 ### CaMeLS meta-training
 
-Running `run.py` with `task=train` lets us train CaMeLS weighting models. For example:
+Running `run.py` with `task=train` lets us train CaMeLS weighting models. You will need to specifiy the model, dataset, and base model. For example:
 
 ```python run.py task=train model=CaMeLS dataset=archivalqa base_model=distilgpt2 base_model_state_dict=/qa_tuned/distilgpt2/state_dict.pt```
 
 Key `run.py task=train` arguments:
+- `update_batch_size`: (defaults to 6) the number of documents sampled per training batch
+- `sequential_update`: (defaults to `True`) How to update the base model in the inner step of meta-training. If true, the base model is sequentially updated on each document in the batch. This results in a gradient tape of `update_batch_size` many base model updates. If false, the base model is updated for a single step on all documents.
+- `grad_acc_steps`: (defaults to 4) The number of batches to accumulate outer loss gradients for before updating the weighting model.
+- `reset_base_freq`: (defaults to 24) The number of documents the base model is updated on before its state is reset to the starting state. 
 
 ### Online Adaptation Evaluation
 
-Key `run.py task=eval` arguments:
-- `downsample_to`: for evaluation, we typically consider many streams of documents sampled from the test split. downsample_to = k corresponds to sampling k documents form the test set
-- `seed`: the random seed used generate the test stream
-- `qa_lt_final`:  whether to additionally light tune the adapted qa model before evaluation. Used for the uniform + qa_tune baseline
-- `lr`: the learning rate used to update the base model on the stream of documents. We note that for all online adaptation methods, performance was very sensitive to learning rate. 
+Running `run.py` with `task=eval` lets us evaluate `CaMeLS` and other baseline loss scaling approached for online adapation of a base model. You will need to specifiy the loss weighting strategy, dataset, and base model. For example:
 
 To evaluate using a saved CaMeLS weight model:
 `python run.py task=eval dataset=streamingqa model=CaMeLS weight_model_path=path/to/CaMeLS_checkpoint.pt base_model=path/to/qa/model_ckpt lr=2.5e-05`
 
 To perform a learning rate sweep of the Salient Span Masking baseline: 
 `python run.py -m task=eval dataset=streamingqa model=ssm base_model=path/to/qa/model_ckpt lr=.0001,.000025,.00000625,.0000015625 test_path=path/to/val_data.csv`
+
+Key `run.py task=eval` arguments:
+- `downsample_to`: for evaluation, we typically consider many streams of documents sampled from the test split. downsample_to = k corresponds to sampling k documents form the test set
+- `seed`: the random seed used generate the test stream
+- `qa_lt_final`:  whether to additionally light tune the adapted qa model before evaluation. Used for the uniform + qa_tune baseline
+- `lr`: the learning rate used to update the base model on the stream of documents. We note that for all online adaptation methods, performance was very sensitive to learning rate. 
 
 ## A worked example
 In this example we will train weight model on distilgpt2 fine tuned for QA on SQuAD. Then we will use the resulting weight model for online adaptation of gpt2-xl. At each step, the outputs are generated in subdirectory begining with `outputs/TASK/DATASET/`
@@ -80,7 +85,7 @@ First, create a virtualenv and install the dependencies.
     source env/bin/activate
     pip install -r requirements.txt
 
-Additionlly, change the `CACHE_DIR` dir variable in `util.py` if you wish.
+Additionally, change the `CACHE_DIR` dir variable in `util.py` if you wish.
 
 For experiements using StreamingQA, download corresponding CSV files locally. Then change the value of `data_dir` in `conf/dataset/streamingqa` and `qa_conf/dataset/streamingqa` accordingly.
 
