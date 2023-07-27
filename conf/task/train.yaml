@@ -30,7 +30,9 @@ bm_learned_layers: -1
 loc_batch_size: 1
 qa_loc: False
 web_text_loc: True
-web_text_csv:  '/iris/u/nathu/temporal-LMs/learned_updating/data/open_web_text/10k.csv' #edit this to point to the csv file containing the web text data
+#edit this to point to the csv files containing the web text data splits
+web_text_csv: '/iris/u/nathu/temporal-LMs/learned_updating/data/open_web_text/8k.csv'
+web_text_val_csv: '/iris/u/nathu/temporal-LMs/learned_updating/data/open_web_text/2k.csv'
 c_kl: .1
 
 #earlier experiments included a norm penality on learned importance weights, but this is no longer used (c_norm: 0)
