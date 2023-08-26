@@ -2,7 +2,7 @@
 
 ## What is this repo?
 
-This repo includes a reference implementation of the CaMeLS meta-learning-based approach to online adaptation as in [Meta-Learning Online Adaptation of Language Models]. CaMeLS meta-learns an importance weighting model that identifies which tokens in a stream of documents are most important to update on during fine-tuning.
+This repo includes a reference implementation of the CaMeLS meta-learning-based approach to online adaptation as in Meta-Learning Online Adaptation of Language Models. CaMeLS meta-learns an importance weighting model that identifies which tokens in a stream of documents are most important to update on during fine-tuning.
 
 The files in this repo are:
 
