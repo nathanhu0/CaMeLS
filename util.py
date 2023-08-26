@@ -22,7 +22,7 @@ warnings.filterwarnings("ignore", message="UserWarning: Passing `max_length` to 
 
 #change this to your cache dir
 
-CACHE_DIR = '/iris/u/nathu/CaMEL/cache'
+CACHE_DIR = 'CACHE/DIR/HERE'
 
 def get_most_frequent_item(lst):
     counter = Counter(lst)
