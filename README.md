@@ -2,7 +2,7 @@
 
 ## What is this repo?
 
-This repo includes a reference implementation of the CaMeLS meta-learning-based approach to online adaptation as in [Meta-Learning Online Adaptation of Language Models](https://arxiv.org/abs/2305.15076). CaMeLS meta-learns an importance weighting model that identifies which tokens in a stream of documents are most important to update on during fine-tuning.
+This repo includes a reference implementation of the CaMeLS meta-learning-based approach to online adaptation as in [Meta-Learning Online Adaptation of Language Models]. CaMeLS meta-learns an importance weighting model that identifies which tokens in a stream of documents are most important to update on during fine-tuning.
 
 The files in this repo are:
 
@@ -122,14 +122,4 @@ And for only fine tuning on salient spans (first line only needs to be run the f
     python run.py task=eval model=ssm dataset=streamingqa base_model=gpt2-xl base_model_state_dict={ABSOLUTE_PATH_TO_GPT2XL_STATE_DICT} downsample_to=1665 lr=2.5e-5
 
 The model generations, per question F1 and EM values, and average F1 and EM scores are generated in an output csv file.
-## Citing CaMeLS
-If CaMeLS or this repository is useful in your own research, you can use the following BibTeX entry:
 
-    @misc{hu2023metalearning,
-      title={Meta-Learning Online Adaptation of Language Models}, 
-      author={Nathan Hu and Eric Mitchell and Christopher D. Manning and Chelsea Finn},
-      year={2023},
-      eprint={2305.15076},
-      archivePrefix={arXiv},
-      primaryClass={cs.CL}
-    }
