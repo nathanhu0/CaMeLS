@@ -142,46 +142,6 @@ class StreamingQADataset(TextAndQuestionDataset):
     
     def get_text(self, idx):
         return self.data_frame.iloc[idx]['text']
-
-class RACEDataset(TextAndQuestionDataset):
-    def __init__(self, json_path, downsample_to = -1, mcqa=False, **kwargs):
-        self.json_path = json_path
-        self.mcqa = mcqa
-        self.data_frame = pd.read_json(json_path)
-        
-        if downsample_to > 0:
-            self.data_frame = return_k_unique(self.data_frame, downsample_to, 'article')
-        
-        else:
-            self.data_frame = self.data_frame.sample(frac=1)
-        super().__init__(**kwargs)
-
-    def __len__(self):
-        return len(self.data_frame)
-    
-    def get_qa(self, idx):
-        row = self.data_frame.iloc[idx]
-        if self.mcqa:
-            answer = row['answer']
-            question = f"Question: {row['question']}\n"
-            for letter, option in zip(['A', 'B', 'C', 'D'], row['options']):
-                question += f"{letter}. {option}\n"
-            question += 'Answer:'
-            return question, answer
-        else:
-            ans_idx = ord(row['answer']) - ord('A')
-            answer = row['options'][ans_idx]
-            question = row['question']
-            return question, answer
-    
-    def get_text(self, idx):
-        return self.data_frame.iloc[idx]['article']
-
-    def get_deduplicated_dataset(self):
-        new_race_ds = copy.deepcopy(self)
-        new_race_ds.data_frame = self.data_frame.drop_duplicates(subset=['article'])
-        return new_race_ds
-    
     
 class SquadDataset(TextAndQuestionDataset):
     
@@ -243,12 +203,12 @@ class ArchivalQADataset(TextAndQuestionDataset):
         return self.data_frame.iloc[idx]['ans_paragraph']
 
     def get_deduplicated_dataset(self):
-        new_squad_ds = copy.deepcopy(self)
+        new_arch_ds = copy.deepcopy(self)
         if self.full_passage:
-            new_squad_ds.data_frame = self.data_frame.drop_duplicates(subset=['ans_text'])
+            new_arch_ds.data_frame = self.data_frame.drop_duplicates(subset=['ans_text'])
         else:
-            new_squad_ds.data_frame = self.data_frame.drop_duplicates(subset=['ans_paragraph'])
-        return new_squad_ds
+            new_arch_ds.data_frame = self.data_frame.drop_duplicates(subset=['ans_paragraph'])
+        return new_arch_ds
 
 class WebTextDataset(Dataset):
     def __init__(self, csv_path, 
