@@ -61,9 +61,9 @@ class TextAndQuestionDataset(Dataset):
             print(f'total question len {qa_ids.shape[1]} excedes max_question len f{self.max_question_len}. Truncating:')
             print(idx)
             num_to_truncate = qa_ids.shape[1] - self.max_question_len
-            qa_ids = qa_ids[:, num_to_truncate:]
-            tok_question['input_ids'] = tok_question['input_ids'][:, num_to_truncate:]
-            tok_question['attention_mask'] = tok_question['attention_mask'][:, num_to_truncate:]
+            qa_ids = qa_ids[:, :-num_to_truncate]
+            tok_question['input_ids'] = tok_question['input_ids'][:, :-num_to_truncate]
+            tok_question['attention_mask'] = tok_question['attention_mask'][:, :-num_to_truncate]
             
         n_pad = self.max_question_len - qa_ids.shape[1]
         qa_attention = torch.cat([tok_question['attention_mask'], (tok_answer['attention_mask'])], 1)
