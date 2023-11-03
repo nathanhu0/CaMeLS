@@ -32,6 +32,7 @@ default_config = OmegaConf.create({
     'norm_from_one': True
     })
 
+#super class for any model which takes text outputs weights for each token
 class WeightingModel(nn.Module):
     def __init__(self, config=default_config,
                  device_ = 'cuda'):
@@ -83,8 +84,6 @@ class WeightingModel(nn.Module):
                                             batch['text_attention'],weights)
                     diffopt.step(loss)
             return f_base_lm, weights
-    
-   
     
     def step(self, update_batch, loc_batches={}, base_lm = None, train=True, sequential_update = False):
         if base_lm is None:

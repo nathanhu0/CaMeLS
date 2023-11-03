@@ -24,16 +24,6 @@ import struct
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-def get_weight_model(args):
-    if args.model_type == 'CaMeLS':
-        return CaMeLSWeightModel(args, device_=DEVICE)
-    elif args.model_type == 'uniform':
-        return UniformWeightModel(args, device_=DEVICE)
-    elif args.model_type == 'ssm':
-        return SSM(tokenizer=args.tokenizer_name, device_=DEVICE)
-    else:
-        raise NameError('Unknown model type')
-
 def get_base_model(args):   
     base_lm = AutoModelForCausalLM.from_pretrained(args.base_model, cache_dir = CACHE_DIR).to(DEVICE)
     
@@ -89,7 +79,7 @@ def train(args):
     with open(os.path.join(args.log_dir, 'config.yaml'), 'w+') as fp:
         OmegaConf.save(config=args, f=fp.name)
         
-    weight_model = get_weight_model(args)
+    weight_model = CaMeLSWeightModel(args, device_=DEVICE)
     base_lm = get_base_model(args)
     base_state_dict = {k:v.detach().clone().cpu() for k, v in base_lm.state_dict().items()}
     
@@ -348,9 +338,17 @@ def evaluate(args):
     
     if args.n_epochs > 0:
         print(f'training with learned weights for {args.n_epochs} epochs')
-        weight_model = get_weight_model(args)
+
         if args.model_type == 'CaMeLS':
+            weight_model = CaMeLSWeightModel(args, device_=DEVICE)
             weight_model.load(target_path = to_absolute_path(args.weight_model_path))
+        elif args.model_type == 'uniform':
+            weight_model =  UniformWeightModel(args, device_=DEVICE)
+        elif args.model_type == 'ssm':
+            weight_model = SSM(tokenizer=args.tokenizer_name, device_=DEVICE)
+        else:
+            raise NameError('Unknown model type')
+            
         weight_model.eval()
         
         optimizer_state_dict = None

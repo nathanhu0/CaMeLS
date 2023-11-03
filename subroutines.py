@@ -33,7 +33,7 @@ def get_optimizer(model, optimizer, lr):
     else:
         raise NameError('unknown optimizer type')
 
-#TODO refactor validat and qa_eval to use the same code
+#TODO refactor validate and qa_eval to use the same code
 
 def qa_eval(dataloader, log_path, model = None, load_path = None, device = None, top_k = 1, diversity_penalty = 10., num_beam_groups = 4, num_beams = 12):
     if device is None:
@@ -142,9 +142,6 @@ def validate(model, tokenizer, dataloader, top_k = 1, greedy = False):
 
         with torch.no_grad():
             batch_nll = model(input_ids = batch['qa_ids'], attention_mask = batch['qa_attention'], labels = batch['qa_target_ids']).loss.item()
-            
-            
-            
         n_tokens = (batch['qa_target_ids'] != -100).sum().item()
         total_nll += n_tokens*batch_nll
         total_tokens += n_tokens
@@ -153,29 +150,7 @@ def validate(model, tokenizer, dataloader, top_k = 1, greedy = False):
 
 
 def qa_light_tune_early_stop(train_dataloader, val_dataloader, save_path, max_steps, val_steps, lr, device, model = None, load_path = None, include_question = False, grad_accumulation_steps = 1, resume=False, optimizer = 'adafactor', stopping_metric = 'nll', stop_k = 1, seed = 42, debug=False, early_stop = True, wandb_log=True, grad_clip_thresh = 1.0e9, save_best_metrics = [], name='', delete_checkpoints = False):
-    """_summary_
-
-    Args:
-        train_dataloader (StreamingQADataset): _description_
-        val_dataloader (StreamingQADataset): _description_
-        save_path (_type_): _description_
-        max_steps (_type_): _description_
-        val_steps (_type_): validated every val_step OPTIMIZER steps
-        lr (_type_): _description_
-        device (_type_): _description_
-        model (_type_, optional): _description_. Defaults to None.
-        load_path (_type_, optional): _description_. Defaults to None.
-        include_question (bool, optional): _description_. Defaults to False.
-        include_eos (bool, optional): _description_. Defaults to True.
-        grad_accumulation_steps (int, optional): Defaults to 1.
-        resume (bool, optional): Defaults to True.
-        optimizer (str, optional): Defaults to 'adafactor'.
-        stopping_metric (str, optional): 'nll' or 'exact_match'. Defaults to 'nll'.
-        stop_k (int, optional): we stop if the current val metric is worse than the past stop_k samples of the metric. Defaults to 1.
-
-    Returns:
-        _type_: _description_
-    """
+    
     save_path = save_path+ 'checkpoints'
     os.makedirs(save_path, exist_ok=True)
     if debug:
@@ -261,10 +236,7 @@ def qa_light_tune_early_stop(train_dataloader, val_dataloader, save_path, max_st
             loss = model(input_ids = batch[ 'qa_ids'], attention_mask = batch['qa_attention'], labels = batch[ 'qa_target_ids']).loss
             if wandb_log: wandb.log({'qa_lt_train_loss': loss})
             loss = loss/grad_accumulation_steps
-            loss.backward()
-            
-            
-            
+            loss.backward() 
             if debug_post_loss:
                 debug_memory('post loss backward')
                 debug_post_loss = False
@@ -324,7 +296,6 @@ def weighted_train(weight_model, dataloader, n_epochs, lr, base_lm, save_dir, gr
         optimizer.zero_grad()
         set_seed(seed*n_epochs + i_epoch)
         for i_step, batch in tqdm(enumerate(dataloader) , total=len(dataloader)):
-            
             with torch.no_grad():
                 weights = weight_model(batch['text_ids'], batch['text_attention'], idx = batch['idx'])
             targets = batch['text_ids'].clone()
