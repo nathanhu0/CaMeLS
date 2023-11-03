@@ -27,8 +27,8 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 def get_base_model(args):   
     base_lm = AutoModelForCausalLM.from_pretrained(args.base_model, cache_dir = CACHE_DIR).to(DEVICE)
     
-    if args.base_model_state_dict is not None:
-        base_lm.load_state_dict(torch.load(args.base_model_state_dict, map_location=base_lm.device))
+    if args.base_model_state_dict_path is not None:
+        base_lm.load_state_dict(torch.load(args.base_model_state_dict_path, map_location=base_lm.device))
     base_lm.train()
     
     #if free all base model layers except embedding/lm head
@@ -121,8 +121,8 @@ def train(args):
             val_loc_dataloaders['qa'] = qa_loc_val_dataloader
             loc_iters['qa'] = iter(qa_loc_dataloader)
         if args.web_text_loc:
-            web_loc_dataloader = DataLoader(WebTextDataset(csv_path=args.webtext_path, loc = True, tokenizer=tokenizer), batch_size=args.loc_batch_size,shuffle=True, drop_last = True)
-            val_web_loc_dataloader = DataLoader(WebTextDataset(loc = True, tokenizer=tokenizer), batch_size=args.loc_batch_size,shuffle=False, drop_last = True)
+            web_loc_dataloader = DataLoader(WebTextDataset(csv_path=args.web_text_csv, loc = True, tokenizer=tokenizer), batch_size=args.loc_batch_size,shuffle=True, drop_last = True)
+            val_web_loc_dataloader = DataLoader(WebTextDataset(csv_path=args.web_text_val_csv, loc = True, tokenizer=tokenizer), batch_size=args.loc_batch_size,shuffle=False, drop_last = True)
             loc_dataloaders['open_web_text'] = web_loc_dataloader
             val_loc_dataloaders['open_web_text'] = val_web_loc_dataloader
             loc_iters['open_web_text'] = iter(web_loc_dataloader)                
