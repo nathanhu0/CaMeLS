@@ -1,7 +1,4 @@
 # @package _global_
-
-
-
 grad_checkpointing: False
 
 notes: ''
@@ -45,11 +42,6 @@ log_stepwise_metrics: False
 grad_clip_thresh: 1e9 
 
 inner_lr: .0005
-
-#unused feature to vary to inner learning rate
-sample_inner_lr: False
-min_inner_lr: .0001
-max_inner_lr: .001
 
 load_checkpoint_path: null
 

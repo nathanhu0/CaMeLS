@@ -8,7 +8,7 @@ import numpy as np
 from tqdm import tqdm
 import higher 
 from collections import defaultdict
-from util import kl_loc_loss, generation_matches, CACHE_DIR
+from util import kl_loc_loss, CACHE_DIR
 import matplotlib.pyplot as plt
 import torch.nn.functional as f
 from omegaconf import OmegaConf

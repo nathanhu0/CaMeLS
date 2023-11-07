@@ -17,12 +17,8 @@ from typing import List
 from collections import Counter
 # %%
 
-
-warnings.filterwarnings("ignore", message="UserWarning: Passing `max_length` to BeamSearchScorer is deprecated and has no effect. `max_length` should be passed directly to `beam_search(...)")
-
 #change this to your cache dir
-
-CACHE_DIR = 'CACHE/DIR/HERE'
+CACHE_DIR = ' /scr/scr-with-most-space/nathu'
 
 def get_most_frequent_item(lst):
     counter = Counter(lst)
@@ -72,15 +68,6 @@ def decode_to_clean_text(tokenizer, ids):
             ids, skip_special_tokens=True, clean_up_tokenization_spaces=True
         )
     return list(map(str.strip, gen_text))
-
-def clean_up(text):
-    text =text.replace('<pad>', '')
-    text = text.replace('</s>', '')
-    text = text.replace(".", '')
-    text = text.replace(',', '')
-    text = text.replace("'", '')
-    text = text.replace('"', '')
-    return text 
 
 def debug_memory(message = ''):
     print(message)
@@ -170,37 +157,6 @@ def kl_loc_loss(pre, post, mask=None):
             mask_ = mask.view(pre_.shape[0])
             kl = (pre_.softmax(-1) * (pre_.log_softmax(-1) - post_.log_softmax(-1))).sum(-1)
             return (kl * mask_).sum() / mask_.sum()
-
-def generation_matches(model: AutoModelForCausalLM, batch, tokenizer, top_k = 1, frac = False, **kwargs):
-    #returns the number of questions the model matches exactly
-    em_correct = 0
-    outs = model.generate(
-                batch['gen_q_ids'],
-                attention_mask=batch["gen_q_attn_mask"],
-                use_cache=True,
-                max_length=batch["gen_q_ids"].shape[1]+16,
-                num_return_sequences=top_k, 
-                num_beam_groups=kwargs.num_beam_groups if 'num_beam_groups' in kwargs else 4,
-                num_beams=kwargs.num_beams if 'num_beams' in kwargs else 12,
-                diversity_penalty=kwargs.diversity_penalty if 'diversity_penalty' in kwargs else 10.,
-                early_stopping=kwargs.early_stopping if 'early_stopping' in kwargs else True,
-                pad_token_id=tokenizer.eos_token_id
-            )
-    dec = decode_to_clean_text(tokenizer, outs)
-    texts = decode_to_clean_text(tokenizer, batch['gen_q_ids'])
-    targets = decode_to_clean_text(tokenizer, batch['gen_q_ids'])
-    for i in range(len(batch['gen_q_ids'])):
-        answer = targets[i]
-        predicted_answers = [dec[i*top_k + j][len(texts[i]):] for j in range(top_k)]
-        em = 0
-        for pred_ans in predicted_answers:
-            if exact_match(pred_ans, answer, match_length = False):
-                em = 1  
-        em_correct += em
-    return em_correct/len(batch['gen_q_ids']) if frac else em_correct
-
-
-
 
 def create_colored_text(words: List[str], data: List[float], font_path='DejaVuSansMono.ttf', pos_cmap=None, neg_cmap=None, max_intensity=.8) -> Image:
     # Create a colormap that maps your data range to colors

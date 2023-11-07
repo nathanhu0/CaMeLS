@@ -2,13 +2,12 @@ defaults:
   - _self_
   - dataset: streamingqa
 
-qa_adapter: vanilla
 seed: 42
 model: 'distilgpt2'
 tokenizer_name: ${model}
 wandb_log: true
 wandb_project: 'CaMeLS'
-wandb_run_name: '${model}_qa_pretraining_${qa_adapter}'
+wandb_run_name: '${model}_qa_pretraining'
 
 early_stop: False
 val_steps: 512

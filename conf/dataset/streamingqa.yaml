@@ -1,7 +1,8 @@
 # @package _global_
 dataset: streamingqa
 
-data_dir: 'absolute/path/to/streamingqa_data'
+#update these paths to point to the data location on your local machine
+data_dir: '/iris/u/nathu/temporal-LMs/learned_updating/data/streamingqa2018+'
 train_path: '${data_dir}/train.csv'
 val_path: '${data_dir}/val.csv'
 test_path: '${data_dir}/test.csv'

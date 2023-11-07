@@ -44,13 +44,13 @@ Key `run.py` arguments:
 - `model`: Weight model configuration corresponding to the loss weighting strategy. During evaluation, can be set to `uniform` (standard fine tuning), `ssm` (fine tuning on salient spans), or `CaMeLS`. Should be set to `model=CaMeLS` for all meta-training runs.
 - `dataset`: dataset used for the given task.
 - `base_model`: used to specify the base language model. To be passed as the `pretrained_model_name_or_path` argument of `AutoModelForCausalLM.from_pretrained()`. During training, the base model updated during the inner step of optimization. During evaluation, the base model is updated on a stream of documents then evaluated on question answering.
-- `base_model_state_dict_path`: If not `None`, we set the base model parameters by loading a state dictionary from the specified path.
+- `base_model_state_dict`: If not `None`, we set the base model parameters by loading a state dictionary from the specified path.
 
 ### CaMeLS meta-training
 
 Running `run.py` with `task=train` lets us train CaMeLS weighting models. You will need to specify the model, dataset, and base model. For example:
 
-```python run.py task=train model=CaMeLS dataset=archivalqa base_model=distilgpt2 base_model_state_dict=/qa_tuned/distilgpt2/state_dict.pt```
+```python run.py task=train weight_model=CaMeLS dataset=archivalqa base_model=distilgpt2 base_model_state_dict=/qa_tuned/distilgpt2/state_dict.pt```
 
 Key `run.py task=train` arguments:
 - `update_batch_size`: (defaults to 6) the number of documents sampled per training batch
@@ -63,10 +63,10 @@ Key `run.py task=train` arguments:
 Running `run.py` with `task=eval` lets us evaluate `CaMeLS` and other baseline loss scaling approaches for online adaptation of a base model. You will need to specify the loss weighting strategy, dataset, and base model. For example:
 
 To evaluate using a saved CaMeLS weight model:
-`python run.py task=eval dataset=streamingqa model=CaMeLS weight_model_path=path/to/CaMeLS_checkpoint.pt base_model=path/to/qa/model_ckpt lr=2.5e-05`
+`python run.py task=eval dataset=streamingqa weight_model=CaMeLS weight_model_path=path/to/CaMeLS_checkpoint.pt base_model=path/to/qa/model_ckpt lr=2.5e-05`
 
 To perform a learning rate sweep of the Salient Span Masking baseline: 
-`python run.py -m task=eval dataset=streamingqa model=ssm base_model=path/to/qa/model_ckpt lr=.0001,.000025,.00000625,.0000015625 test_path=path/to/val_data.csv`
+`python run.py -m task=eval dataset=streamingqa weight_model=ssm base_model=path/to/qa/model_ckpt lr=.0001,.000025,.00000625,.0000015625 test_path=path/to/val_data.csv`
 
 Key `run.py task=eval` arguments:
 - `downsample_to`: for evaluation, we typically consider many streams of documents sampled from the test split. `downsample_to = k` corresponds to sampling `k` documents from the test set
@@ -80,8 +80,8 @@ In this example we will train weight model on distilgpt2 fine tuned for QA on SQ
 ### Step 1: Set up environment
 First, create a virtualenv and install the dependencies. 
 
-    python3 -m venv env
-    source env/bin/activate
+    python3 -m venv ./env
+    source ./env/bin/activate
     pip install -r requirements.txt
 
 Additionally, change the `CACHE_DIR` dir variable in `util.py` if you wish.
@@ -102,7 +102,7 @@ The models with, the lowest validation NLL, and highest validation F1s score and
 
 We now use the smaller qa-tuned distilgpt2 as the _base_model_ used to train a CaMeLS weighting model
 
-    python run.py task=train model=CaMeLS dataset=streamingqa base_model=distilgpt2 base_model_state_dict={ABSOLUTE_PATH_TO_DISTILGPT2_STATE_DICT}
+    python run.py task=train weight_model=CaMeLS dataset=streamingqa base_model=distilgpt2 base_model_state_dict={ABSOLUTE_PATH_TO_DISTILGPT2_STATE_DICT}
 
 Sample model importance weights are generated periodically during training. Model checkpoints are saved every epoch and at each validation step with lower loss than all previous steps.
 
@@ -110,16 +110,16 @@ Sample model importance weights are generated periodically during training. Mode
 
 Lastly, we will use our trained weighting model to adapt a gpt2-xl which we previously fined tuned for question answering. We set `dowmsample_to=1665` to adapt on a stream of 1665 sampled articles.
 
-    python run.py task=eval model=CaMeLS weight_model_path={PATH_TO_WEIGHT_MODEL_CHECKPOINT} dataset=streamingqa base_model=gpt2-xl base_model_state_dict={ABSOLUTE_PATH_TO_GPT2XL_STATE_DICT} downsample_to=1665 lr=2.5e-5
+    python run.py task=eval weight_model=CaMeLS weight_model_path={PATH_TO_WEIGHT_MODEL_CHECKPOINT} dataset=streamingqa base_model=gpt2-xl base_model_state_dict={ABSOLUTE_PATH_TO_GPT2XL_STATE_DICT} downsample_to=1665 lr=2.5e-5
 
 To perform this same evaluation using a uniform fine tuning baseline
 
-    python run.py task=eval model=uniform dataset=streamingqa base_model=gpt2-xl base_model_state_dict={ABSOLUTE_PATH_TO_GPT2XL_STATE_DICT} downsample_to=1665 lr=2.5e-5
+    python run.py task=eval weight_model=uniform dataset=streamingqa base_model=gpt2-xl base_model_state_dict={ABSOLUTE_PATH_TO_GPT2XL_STATE_DICT} downsample_to=1665 lr=2.5e-5
 
 And for only fine tuning on salient spans (first line only needs to be run the first time).
 
     python -m spacy download en_core_web_sm
-    python run.py task=eval model=ssm dataset=streamingqa base_model=gpt2-xl base_model_state_dict={ABSOLUTE_PATH_TO_GPT2XL_STATE_DICT} downsample_to=1665 lr=2.5e-5
+    python run.py task=eval weight_model=ssm dataset=streamingqa base_model=gpt2-xl base_model_state_dict={ABSOLUTE_PATH_TO_GPT2XL_STATE_DICT} downsample_to=1665 lr=2.5e-5
 
 The model generations, per question F1 and EM values, and average F1 and EM scores are generated in an output csv file.
 ## Citing CaMeLS

@@ -3,9 +3,9 @@ import os
 from regex import I
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from torch.utils.data import DataLoader
-from exp_datasets import StreamingQADataset, WebTextDataset, SquadDataset, ArchivalQADataset, RangeSampler, RACEDataset
+from exp_datasets import StreamingQADataset, WebTextDataset, SquadDataset, ArchivalQADataset, RangeSampler
 from weight_model import CaMeLSWeightModel, UniformWeightModel, SSM
-from util import set_seed, CACHE_DIR, debug_memory
+from util import set_seed, CACHE_DIR, debug_memory, create_colored_text
 import csv
 from subroutines import qa_eval, weighted_train, qa_ppl_eval, qa_light_tune_early_stop, get_optimizer
 import hydra
@@ -27,8 +27,8 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 def get_base_model(args):   
     base_lm = AutoModelForCausalLM.from_pretrained(args.base_model, cache_dir = CACHE_DIR).to(DEVICE)
     
-    if args.base_model_state_dict_path is not None:
-        base_lm.load_state_dict(torch.load(args.base_model_state_dict_path, map_location=base_lm.device))
+    if args.base_model_state_dict is not None:
+        base_lm.load_state_dict(torch.load(args.base_model_state_dict, map_location=base_lm.device))
     base_lm.train()
     
     #if free all base model layers except embedding/lm head
@@ -48,24 +48,21 @@ def get_base_model(args):
            
     return base_lm
 
-def set_eval_batch_params(args):
-    key= ''.join(args.base_model.split('/')[-1].split('-')[:-1])
-   
-    batch_defaults = defaultdict(lambda : 1, {'distilgpt2': 4, 'gpt2': 4, 'gpt2-medium': 2, 'gpt2-large': 1})
-    grad_acc_defaults = defaultdict(lambda : 16,{'distilgpt2': 4, 'gpt2': 4, 'gpt2-medium': 8, 'gpt2-large': 16})
-    
-    if args.batch_size == -1: args.batch_size = batch_defaults[key]
-    if args.grad_acc_steps == -1: args.grad_acc_steps = grad_acc_defaults[key]
-
-def set_qa_lt_batch_params(args):
-    key=args.base_model.split('qa_models/')[-1]
-    if '-retrain' in key:
-        key = key.split('-retrain')[0]
-   
-    batch_defaults = defaultdict(lambda : 2, {'distilgpt2': 32, 'gpt2': 16, 'gpt2-medium': 8, 'gpt2-large': 8, 'gpt2-xl': 4, 'gpt-neo-1.3B': 4})
-    
-    if args.lt_batch_size == -1: args.lt_batch_size = batch_defaults[key]
-    if args.lt_grad_acc_steps == -1: args.lt_grad_acc_steps = 64//args.lt_batch_size
+def plot_sample_weights(weight_model, batch, tokenizer, save_dir = None, log_to_wandb = False):
+    with torch.no_grad():
+        weights = weight_model(batch['text_ids'], batch['text_attention'])
+    sample_weights = []
+    for i in range(len(batch['text_ids'])):
+        text = [tokenizer.decode(t) for t in batch['text_ids'][i]][:sum(batch['text_attention'][i])]
+        w = weights[i].detach().cpu().numpy()[:sum(batch['text_attention'][i])]
+        sample_weights.append(create_colored_text(text, w))
+    if save_dir is not None:
+        os.makedirs(save_dir, exist_ok = True)
+        for i, image in enumerate(sample_weights):
+            image.save(os.path.join(save_dir, f'weights_{i}.png'))
+    if log_to_wandb:
+        for i, image in enumerate(sample_weights):
+            wandb.log({f'sample_weights_{i}': wandb.Image(image)})
 
 def train(args):
     #Logging into WANDB if needed
@@ -78,7 +75,8 @@ def train(args):
 
     with open(os.path.join(args.log_dir, 'config.yaml'), 'w+') as fp:
         OmegaConf.save(config=args, f=fp.name)
-        
+    
+    print('Loading model...')
     weight_model = CaMeLSWeightModel(args, device_=DEVICE)
     base_lm = get_base_model(args)
     base_state_dict = {k:v.detach().clone().cpu() for k, v in base_lm.state_dict().items()}
@@ -86,18 +84,22 @@ def train(args):
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name, cache_dir = CACHE_DIR)
     set_seed(args.seed)
 
+    print('Loading data...')
     if args.dataset == 'streamingqa':
-        train_dataloader = DataLoader( StreamingQADataset(args.train_path, tokenizer=tokenizer), batch_size=args.update_batch_size, shuffle=True)
-        val_dataloader = DataLoader( StreamingQADataset(args.val_path, tokenizer=tokenizer,  qa_for_generation=args.val_em), batch_size=args.update_batch_size)
+        train_dataset =  StreamingQADataset(args.train_path, tokenizer=tokenizer)
+        val_dataset = StreamingQADataset(args.val_path, tokenizer=tokenizer, qa_for_generation=args.val_em)
     elif args.dataset == 'squad':
-        train_dataloader = DataLoader(SquadDataset(args.train_split, args.train_start_idx, args.train_end_idx, tokenizer=tokenizer), batch_size=args.update_batch_size, shuffle=True)
-        val_dataloader = DataLoader(SquadDataset(args.val_split, args.val_start_idx, args.val_end_idx, tokenizer=tokenizer), batch_size=args.update_batch_size, shuffle=True)
+        train_dataset = SquadDataset(args.train_split, args.train_start_idx, args.train_end_idx, tokenizer=tokenizer)
+        val_dataset = SquadDataset(args.val_split, args.val_start_idx, args.val_end_idx, tokenizer=tokenizer)
     elif args.dataset == 'archivalqa':
-        train_dataloader = DataLoader( ArchivalQADataset(args.train_path, tokenizer=tokenizer, full_passage=args.full_passage), batch_size=args.update_batch_size, shuffle=True)
-        val_dataloader = DataLoader( ArchivalQADataset(args.val_path, tokenizer=tokenizer, full_passage=args.full_passage,  qa_for_generation=args.val_em), batch_size=args.update_batch_size)
+        train_dataset =  ArchivalQADataset(args.train_path, tokenizer=tokenizer, full_passage=args.full_passage)
+        val_dataset =  ArchivalQADataset(args.val_path, tokenizer=tokenizer, full_passage=args.full_passage,  qa_for_generation=args.val_em)
     else:
         raise NotImplementedError(f"Dataset {args.dataset} not implemented")
-    sample_train_batch = next(iter(train_dataloader))
+    
+    train_dataloader = DataLoader(train_dataset, batch_size=args.update_batch_size, shuffle=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=args.update_batch_size)
+        
     sample_val_batch = next(iter(val_dataloader))
 
     loc_iters = {}
@@ -105,6 +107,7 @@ def train(args):
     #separate dataloaders for validation so our validation dataloaders do not get shuffled
     val_loc_dataloaders = {}
     if args.c_kl > 0:
+        #we support using in domain qa data for locality, but our final method does not use this
         if args.qa_loc:
             if args.dataset == 'streamingqa':
                 qa_loc_dataloader =  DataLoader(StreamingQADataset(args.train_path, loc = True, tokenizer=tokenizer), batch_size=args.loc_batch_size, shuffle=True, drop_last = True)
@@ -128,19 +131,16 @@ def train(args):
             loc_iters['open_web_text'] = iter(web_loc_dataloader)                
     
     w_optimizer = weight_model.get_optimizer(args.outer_lr)
+    
     if args.reduce_lr_on_plateau:
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(w_optimizer, 'min', factor=0.7071, patience=5, verbose=True)
+        
     completed_epochs = 0
     if args.load_checkpoint_path is not None:
         weight_model.load(target_path = args.load_checkpoint_path)
     
     best_val_loss = 1e9
     original_inner_lr = args.inner_lr
-    if args.sample_inner_lr:
-        cur_inner_lr = np.random.uniform(args.min_inner_lr, args.max_inner_lr)
-        weight_model.set_inner_lr(cur_inner_lr)
-    else:
-        cur_inner_lr = args.inner_lr 
     
     if args.reset_base_freq%args.update_batch_size != 0:
         print('reset_base_freq must be divisible by update_batch_size')
@@ -155,18 +155,17 @@ def train(args):
         for i_step, batch in tqdm(enumerate(train_dataloader), desc='training_epoch', position=0, total=len(train_dataloader)):
             #we periodically plot weights on both training and validation data
             if args.sample_weights and (i_step) % (args.sample_steps*args.grad_acc_steps) == 0:
-                weight_model.plot_weights(sample_train_batch, tokenizer, f'{os.path.join(args.log_dir, "sample_weights", "train_weights")}{i_epoch}-{i_step}')
-                if args.val:
-                    weight_model.plot_weights(sample_val_batch, tokenizer, f'{os.path.join(args.log_dir, "sample_weights", "val_weights")}{i_epoch}-{i_step}')
+                plot_sample_weights(weight_model, sample_val_batch, tokenizer, save_dir = os.path.join(args.log_dir, 'sample_weights'), log_to_wandb=args.wandb_log)                    
+                    
             if args.val and (i_step) % (args.val_steps*args.grad_acc_steps) == 0:
                 print('VALIDATING')
                 weight_model.eval()
-                weight_model.set_inner_lr(original_inner_lr)
+
                 cur_state_dict = {k:v.detach().clone().cpu() for k, v in base_lm.state_dict().items()}
                 base_lm.load_state_dict(base_state_dict)
                 val_metrics = weight_model.validate(base_lm, val_dataloader, val_loc_dataloaders, reset_base_freq=batchs_per_base_reset, sequential_update=args.sequential_update)
                 base_lm.load_state_dict(cur_state_dict)
-                weight_model.set_inner_lr(cur_inner_lr)
+
                 weight_model.train()
                 if args.wandb_log: wandb.log({'val': val_metrics}, commit = False)
                 if val_metrics['[AGG]total_loss'] < best_val_loss:
@@ -199,15 +198,9 @@ def train(args):
             if args.reset_base_freq > 1:
                 if (i_step+1) % batchs_per_base_reset == 0:
                     base_lm.load_state_dict(base_state_dict)
-                    if args.sample_inner_lr:
-                        cur_inner_lr = np.random.uniform(args.min_inner_lr, args.max_inner_lr)
-                        weight_model.set_inner_lr(cur_inner_lr)
-            elif args.sample_inner_lr:
-                cur_inner_lr = np.random.uniform(args.min_inner_lr, args.max_inner_lr)
-                weight_model.set_inner_lr(cur_inner_lr)
             
             for k, v in metrics.items():
-                metrics_dic[f'[AGG]{k}'].append(v)
+                metrics_dic[f'{k}'].append(v)
                 if args.log_stepwise_metrics:
                     metrics_dic[f'[step-{i_step % args.reset_base_freq }]{k}'].append(v)
         
@@ -219,7 +212,7 @@ def train(args):
                 w_optimizer.step()
                 w_optimizer.zero_grad()
                 if args.wandb_log: 
-                    wandb.log({'grad_norm': grad_norm, 'inner_lr':cur_inner_lr},commit = False) 
+                    wandb.log({'grad_norm': grad_norm} ,commit = False) 
                     wandb.log({'train': {f'{k}': np.mean(v) for k,v in metrics_dic.items()}})
                 metrics_dic.clear()
 
@@ -243,10 +236,7 @@ def evaluate(args):
         print("created folder : ", args.log_dir)
     else:
         print(args.log_dir, "folder already exists.")
-    
-    set_eval_batch_params(args)
-    set_qa_lt_batch_params(args)
-    
+
     print(f"batch_size:{args.batch_size}, grad_acc_steps:{args.grad_acc_steps}")
     
     if args.wandb_log:

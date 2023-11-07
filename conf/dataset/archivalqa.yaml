@@ -1,6 +1,7 @@
 # @package _global_
 dataset: archivalqa
 
+#update these paths to point to the data location on your local machine
 data_dir: 'absolute/path/to/archivalqa_data_dir'
 train_path: '${data_dir}/train.csv'
 val_path: '${data_dir}/val.csv'

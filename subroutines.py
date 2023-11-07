@@ -3,7 +3,7 @@ from transformers import Adafactor, GPT2LMHeadModel, GPT2TokenizerFast, AutoMode
 from exp_datasets import StreamingQADataset
 import torch
 from tqdm import tqdm
-from util import weighted_lm_loss, decode_to_clean_text, exact_match, clean_up, CACHE_DIR, set_seed, debug_memory, f1_score
+from util import weighted_lm_loss, decode_to_clean_text, exact_match, CACHE_DIR, set_seed, debug_memory, f1_score
 import numpy as np
 from copy import deepcopy
 import csv
@@ -22,8 +22,6 @@ def gen_save(model, path):
         torch.save(model, path)
 
 def get_optimizer(model, optimizer, lr):
-    if model.__class__.__name__ == 'promptedGPT2Model':
-        return model.get_optimizer(lr, optimizer = optimizer)
     if optimizer == 'sgd':
         return torch.optim.SGD(list(model.parameters()), lr=lr)
     elif optimizer == 'adafactor':
@@ -33,7 +31,7 @@ def get_optimizer(model, optimizer, lr):
     else:
         raise NameError('unknown optimizer type')
 
-#TODO refactor validate and qa_eval to use the same code
+#qa_eval and validate are the same function, but qa_eval writes per line generations to a csv file
 
 def qa_eval(dataloader, log_path, model = None, load_path = None, device = None, top_k = 1, diversity_penalty = 10., num_beam_groups = 4, num_beams = 12):
     if device is None:
@@ -149,7 +147,7 @@ def validate(model, tokenizer, dataloader, top_k = 1, greedy = False):
     return {'exact_match': em_correct, 'nll': avg_nll, 'avg_f1': np.mean(avg_f1s), 'max_f1': np.mean(max_f1s)}
 
 
-def qa_light_tune_early_stop(train_dataloader, val_dataloader, save_path, max_steps, val_steps, lr, device, model = None, load_path = None, include_question = False, grad_accumulation_steps = 1, resume=False, optimizer = 'adafactor', stopping_metric = 'nll', stop_k = 1, seed = 42, debug=False, early_stop = True, wandb_log=True, grad_clip_thresh = 1.0e9, save_best_metrics = [], name='', delete_checkpoints = False):
+def qa_light_tune_early_stop(train_dataloader, val_dataloader, save_path, max_steps, val_steps, lr, device, model = None, load_path = None, grad_accumulation_steps = 1, resume=False, optimizer = 'adam', stopping_metric = 'nll', stop_k = 1, seed = 42, debug=False, early_stop = True, wandb_log=True, grad_clip_thresh = 1.0e9, save_best_metrics = [], name='', delete_checkpoints = False):
     
     save_path = save_path+ 'checkpoints'
     os.makedirs(save_path, exist_ok=True)
