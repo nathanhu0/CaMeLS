@@ -246,16 +246,15 @@ def evaluate(args):
     with open(os.path.join(args.log_dir, 'config.yaml'), 'w+') as fp:
         OmegaConf.save(config=args, f=fp.name)
 
+    set_seed(args.seed)
+    
+    print('Loading model...')
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     base_lm = get_base_model(args)
     base_lm.to(device)
-    
-    
-    if args.debug:
-        debug_memory('base_model loaded')
-    
-    set_seed(args.seed)
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name, cache_dir = CACHE_DIR)
+    
+    print('Loading data...')
     if args.dataset == 'streamingqa':
         test_dataset = StreamingQADataset(args.test_path, tokenizer=tokenizer, qa_for_generation=True, pad_qa_for_gen = (args.generation_batch_size != 1), downsample_to=args.downsample_to)
         weighted_train_dataset = test_dataset
@@ -282,15 +281,7 @@ def evaluate(args):
     lt_val_dataloader = DataLoader(lt_val_dataset, batch_size=args.lt_batch_size, shuffle=False)
         
         
-    weighted_train_dataloaders = []
-    
-    if args.eval_every_k == -1:
-        args.eval_every_k = len(weighted_train_dataset)
-        
-    for start in range(0, len(weighted_train_dataset), args.eval_every_k):
-        end = min(start + args.eval_every_k, len(weighted_train_dataset))
-        weighted_train_dataloaders.append(DataLoader(weighted_train_dataset, batch_size=args.batch_size, sampler=RangeSampler(start, end)))
-   
+    weighted_train_dataloader = DataLoader(weighted_train_dataset, batch_size=args.batch_size, shuffle=False)
     
     if isinstance(args.eval, str):
         args.eval = [args.eval] 
@@ -309,18 +300,13 @@ def evaluate(args):
         else:
             print('unknown evaluation mode:', eval_mode)
 
-    if args.qa_lt_init:
-        #hard code a lot of these optimizers
-        base_lm = qa_light_tune_early_stop(lt_dataloader, lt_val_dataloader, os.path.join(args.log_dir, f'init_qa_lt'), args.lt_steps, args.lt_val_steps, args.lt_lr, device, model = base_lm, grad_accumulation_steps=args.grad_acc_steps, optimizer = args.optimizer, seed = args.seed, debug=args.debug, early_stop=True, wandb_log=args.wandb_log, grad_clip_thresh=args.grad_clip_thresh, name='init_qa_lt', stopping_metric='nll', stop_k = 5)
-        
-
     if args.eval_init:
         print(f'evaluating init model ')
         base_lm.eval()
         for mode, eval_fn in eval_fns.items():
             eval_fn(test_dataloader, os.path.join(args.log_dir, f'init_{mode}.csv'), model = base_lm)
-            
-    if args.qa_eval_intermediate:
+    
+    if args.unrelated_qa_eval:
         print(f'evaluating init model on held out qa')
         base_lm.eval()
         for mode, eval_fn in eval_fns.items():
@@ -341,41 +327,17 @@ def evaluate(args):
             
         weight_model.eval()
         
-        optimizer_state_dict = None
-        for i, wt_dataloader in enumerate(weighted_train_dataloaders):
-        #base_lm will be modified in place
-            base_lm.requires_grad_(True)
-            base_lm.train()
-            if args.eval_every_k_post != -1:
-                os.makedirs(os.path.join(args.log_dir, 'ft'), exist_ok=True)
-                base_lm, optimizer_state_dict = weighted_train(weight_model, wt_dataloader, args.n_epochs, args.lr, base_lm, save_dir = os.path.join(args.log_dir, 'ft'), grad_accumulation_steps=args.grad_acc_steps, resume = args.resume, optimizer = args.optimizer, seed = args.seed, debug = args.debug, wandb_log=args.wandb_log, grad_clip_thresh=args.grad_clip_thresh, optimizer_state_dict = optimizer_state_dict, save_steps=args.eval_every_k_post)
-            else:
-                base_lm, optimizer_state_dict = weighted_train(weight_model, wt_dataloader, args.n_epochs, args.lr, base_lm, save_dir = os.path.join(args.log_dir, 'ft'), grad_accumulation_steps=args.grad_acc_steps, resume = args.resume, optimizer = args.optimizer, seed = args.seed, debug = args.debug, wandb_log=args.wandb_log, grad_clip_thresh=args.grad_clip_thresh, optimizer_state_dict = optimizer_state_dict)
-    
-            if args.qa_lt_intermediate:
-                
-                k_updates = (i+1)*args.eval_every_k
-                base_lm = qa_light_tune_early_stop(lt_dataloader, lt_val_dataloader, os.path.join(args.log_dir, f'post{k_updates}_qa_lt'), args.lt_steps, args.lt_val_steps, args.lt_lr, device, model = base_lm, grad_accumulation_steps=args.grad_acc_steps, optimizer = args.optimizer, seed = args.seed, debug=args.debug, early_stop=args.lt_early_stop, wandb_log=args.wandb_log, grad_clip_thresh=args.grad_clip_thresh, name=f'qa_lt_{k_updates}', stopping_metric=args.lt_stopping_metric)
-                
-            
-            if args.eval_intermediate:
-                k_updates = (i+1)*args.eval_every_k
-                print(f'evaluating model after {k_updates} updates')
-                
-                base_lm.eval()
-                for mode, eval_fn in eval_fns.items():
-                    eval_fn(test_dataloader, os.path.join(args.log_dir, f'post{k_updates}_{mode}.csv'), model = base_lm)
-                print('model hash post:', base_lm.state_dict()['transformer.wte.weight'].sum(), base_lm.state_dict()['transformer.h.0.ln_1.weight'].sum())
-            if args.qa_eval_intermediate:
-                print(f'evaluating model after {k_updates} updates on held out qa')
-                base_lm.eval()
-                for mode, eval_fn in eval_fns.items():
-                    eval_fn(lt_val_dataloader, os.path.join(args.log_dir, f'post{k_updates}_qa_val_{mode}.csv'), model = base_lm)      
-            
-    if args.debug:
-        debug_memory('post_weight_training') 
         
-    #light tuning 
+        #base_lm will be modified in place
+        base_lm.requires_grad_(True)
+        base_lm.train()
+        if args.eval_every_k != -1:
+            os.makedirs(os.path.join(args.log_dir, 'ft'), exist_ok=True)
+            base_lm, _ = weighted_train(weight_model, weighted_train_dataloader, args.n_epochs, args.lr, base_lm, save_dir = os.path.join(args.log_dir, 'ft'), grad_accumulation_steps=args.grad_acc_steps, resume = args.resume, optimizer = args.optimizer, seed = args.seed, debug = args.debug, wandb_log=args.wandb_log, grad_clip_thresh=args.grad_clip_thresh, save_steps=args.eval_every_k)
+        else:
+            base_lm, _ = weighted_train(weight_model, weighted_train_dataloader, args.n_epochs, args.lr, base_lm, save_dir = os.path.join(args.log_dir, 'ft'), grad_accumulation_steps=args.grad_acc_steps, resume = args.resume, optimizer = args.optimizer, seed = args.seed, debug = args.debug, wandb_log=args.wandb_log, grad_clip_thresh=args.grad_clip_thresh)
+        
+    #retune the adapted model for qa
     if args.qa_lt_final:
         print("light tuning for qa with early stopping")
         base_lm = qa_light_tune_early_stop(lt_dataloader, lt_val_dataloader, os.path.join(args.log_dir, f'final_qa_lt'), args.lt_steps, args.lt_val_steps, args.lt_lr, device, model = base_lm, grad_accumulation_steps=args.grad_acc_steps, optimizer = args.optimizer, seed = args.seed, debug=args.debug, early_stop=args.lt_early_stop, wandb_log=args.wandb_log, grad_clip_thresh=args.grad_clip_thresh, name=f'final_qa_lt', stopping_metric=args.lt_stopping_metric, stop_k = args.lt_patience, delete_checkpoints=args.delete_checkpoints)
@@ -385,19 +347,20 @@ def evaluate(args):
     for mode, eval_fn in eval_fns.items():
         eval_fn(test_dataloader, os.path.join(args.log_dir, f'final_{mode}.csv'), model = base_lm)
     
-    if args.qa_eval_intermediate:
+    if args.unrelated_qa_eval:
         print(f'evaluating final model on held out qa')
         base_lm.eval()
         for mode, eval_fn in eval_fns.items():
             eval_fn(lt_val_dataloader, os.path.join(args.log_dir, f'final_qa_val_{mode}.csv'), model = base_lm)  
             
-    if args.eval_every_k_post != -1:
+    if args.eval_every_k != -1:
         for state_dic_path in glob.glob(os.path.join(args.log_dir, 'ft', '*.pt')):
             base_lm.load_state_dict(torch.load(state_dic_path, map_location=base_lm.device))
-            output_path = state_dic_path.replace('.pt', 'eval')
+            output_path = os.path.join(args.log_dir, state_dic_path.split('/')[-1].replace('.pt', ''))
             for mode, eval_fn in eval_fns.items():
                 eval_fn(test_dataloader, output_path + f'{mode}.csv', model = base_lm)    
-                eval_fn(lt_val_dataloader,  output_path + f'qa_val{mode}.csv', model = base_lm)
+                if args.unrelated_qa_eval:
+                    eval_fn(lt_val_dataloader,  output_path + f'qa_val{mode}.csv', model = base_lm)
             os.remove(state_dic_path)
         
     if args.wandb_log:

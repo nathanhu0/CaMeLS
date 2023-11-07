@@ -9,7 +9,7 @@ defaults:
 
 seed: 42
 resume: False
-debug: True
+debug: False
 early_stop: False
 
 base_model: 'distilgpt2'

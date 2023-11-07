@@ -5,7 +5,7 @@ ipykernel==6.15.1
 hydra-core==1.2.0
 higher==0.2.1
 pandas==1.4.3
-datasets==2.11.0
+datasets==2.14.6
 spacy==3.5.2
 Pillow==9.2.0
 matplotlib==3.5.2
