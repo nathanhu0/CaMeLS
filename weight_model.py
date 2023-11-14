@@ -100,7 +100,6 @@ class WeightingModel(nn.Module):
                 
         updated_lm, weights = self.get_updated_model(update_batch, base_lm, higher_grad = train, sequential_update = sequential_update)
         
-        #new line i pray doesn't make everything crash
         updated_lm.eval()
         qa_loss = updated_lm(input_ids = update_batch['qa_ids'], attention_mask = update_batch['qa_attention'], 
                                                         labels = update_batch['qa_target_ids']).loss
@@ -135,7 +134,6 @@ class WeightingModel(nn.Module):
                 total_loss += self.c_kl*kl_div/len(loc_batches)
                 
         if (self.norm is not None): 
-            #this is awefully manualfc
             weight_norm = (((weights**self.norm)* f.normalize(update_batch['text_attention']*1., p=1, dim=1)).sum(1) ** (1/self.norm))
             avg_norm = weight_norm.mean()
             weight_norm_from_one = ((((weights-1)**self.norm)* f.normalize(update_batch['text_attention']*1., p=1, dim=1)).sum(1) ** (1/self.norm))
