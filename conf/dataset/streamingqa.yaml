@@ -2,7 +2,7 @@
 dataset: streamingqa
 
 #update these paths to point to the data location on your local machine
-data_dir: '/iris/u/nathu/temporal-LMs/learned_updating/data/streamingqa2018+'
+data_dir: '/abosolute/path/to/streamingqa/here'
 train_path: '${data_dir}/train.csv'
 val_path: '${data_dir}/val.csv'
 test_path: '${data_dir}/test.csv'

@@ -96,11 +96,11 @@ Next we train 2 language models for question answering.
     python train_qa.py dataset=streamingqa model=distilgpt2
     python train_qa.py dataset=streamingqa model=gpt2-xl
 
-The models with, the lowest validation NLL, and highest validation F1s score and and highest exact match are saved in the 'checkpoints' subdirectory. (For small models which fail to achieve significant F1 or EM scores, the model with the lowest NLL is used. Otherwise, our experiments chose the models with highest F1). 
+The models with the lowest validation NLL, highest validation F1 score, and highest exact match are saved in the 'checkpoints' subdirectory. (For small models which fail to achieve significant F1 or EM scores, the model with the lowest NLL is selected. Otherwise, our experiments chose the models with highest F1). 
 
 ### Step 2: Train a CaMeLS weight model
 
-We now use the smaller qa-tuned distilgpt2 as the _base_model_ used to train a CaMeLS weighting model
+We now use the smaller qa-tuned distilgpt2 as the _base_model_ for meta-training of a CaMeLS weighting model.
 
     python run.py task=train weight_model=CaMeLS dataset=streamingqa base_model=distilgpt2 base_model_state_dict={ABSOLUTE_PATH_TO_DISTILGPT2_STATE_DICT}
 
@@ -108,18 +108,26 @@ Sample model importance weights are generated periodically during training. Mode
 
 ### Step 3: Evaluate a trained weight model for Online Adapation
 
-Lastly, we will use our trained weighting model to adapt a gpt2-xl which we previously fined tuned for question answering. We set `dowmsample_to=1665` to adapt on a stream of 1665 sampled articles.
+Lastly, we will use our trained weighting model to adapt the gpt2-xl model which we previously fined tuned for question answering. We set `dowmsample_to=1665` to adapt on a stream of 1665 sampled articles.
 
     python run.py task=eval weight_model=CaMeLS weight_model_path={PATH_TO_WEIGHT_MODEL_CHECKPOINT} dataset=streamingqa base_model=gpt2-xl base_model_state_dict={ABSOLUTE_PATH_TO_GPT2XL_STATE_DICT} downsample_to=1665 lr=2.5e-5
 
 To perform this same evaluation using a uniform fine tuning baseline
 
+    python run.py task=eval weight_model=uniform qa_lt_final=True dataset=streamingqa base_model=gpt2-xl base_model_state_dict={ABSOLUTE_PATH_TO_GPT2XL_STATE_DICT} downsample_to=1665 lr=2.5e-5
+
+For the uniform + post adaptation QA tuning:
+
     python run.py task=eval weight_model=uniform dataset=streamingqa base_model=gpt2-xl base_model_state_dict={ABSOLUTE_PATH_TO_GPT2XL_STATE_DICT} downsample_to=1665 lr=2.5e-5
 
-And for only fine tuning on salient spans (first line only needs to be run the first time).
+For only fine tuning on salient spans (first line only needs to be run the first time):
 
     python -m spacy download en_core_web_sm
     python run.py task=eval weight_model=ssm dataset=streamingqa base_model=gpt2-xl base_model_state_dict={ABSOLUTE_PATH_TO_GPT2XL_STATE_DICT} downsample_to=1665 lr=2.5e-5
+
+For the TFIDF + thresholding baseline:
+
+   python run.py task=eval weight_model=TFIDF min_threshold=.05 dataset=streamingqa base_model=gpt2-xl base_model_state_dict={ABSOLUTE_PATH_TO_GPT2XL_STATE_DICT} downsample_to=1665 lr=2.5e-5
 
 The model generations, per question F1 and EM values, and average F1 and EM scores are generated in an output csv file.
 ## Citing CaMeLS

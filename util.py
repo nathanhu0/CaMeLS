@@ -18,7 +18,7 @@ from collections import Counter
 # %%
 
 #change this to your cache dir
-CACHE_DIR = '/scr/scr-with-most-space/nathu'
+CACHE_DIR = '~/.cache'
 
 def get_most_frequent_item(lst):
     counter = Counter(lst)
