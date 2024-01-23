@@ -114,12 +114,20 @@ Lastly, we will use our trained weighting model to adapt the gpt2-xl model which
 
 To perform this same evaluation using a uniform fine tuning baseline
 
+    python run.py task=eval weight_model=uniform qa_lt_final=True dataset=streamingqa base_model=gpt2-xl base_model_state_dict={ABSOLUTE_PATH_TO_GPT2XL_STATE_DICT} downsample_to=1665 lr=2.5e-5
+
+For the uniform + post adaptation QA tuning:
+
     python run.py task=eval weight_model=uniform dataset=streamingqa base_model=gpt2-xl base_model_state_dict={ABSOLUTE_PATH_TO_GPT2XL_STATE_DICT} downsample_to=1665 lr=2.5e-5
 
-And for only fine tuning on salient spans (first line only needs to be run the first time).
+For only fine tuning on salient spans (first line only needs to be run the first time):
 
     python -m spacy download en_core_web_sm
     python run.py task=eval weight_model=ssm dataset=streamingqa base_model=gpt2-xl base_model_state_dict={ABSOLUTE_PATH_TO_GPT2XL_STATE_DICT} downsample_to=1665 lr=2.5e-5
+
+For the TFIDF + thresholding baseline:
+
+   python run.py task=eval weight_model=TFIDF min_threshold=.05 dataset=streamingqa base_model=gpt2-xl base_model_state_dict={ABSOLUTE_PATH_TO_GPT2XL_STATE_DICT} downsample_to=1665 lr=2.5e-5
 
 The model generations, per question F1 and EM values, and average F1 and EM scores are generated in an output csv file.
 ## Citing CaMeLS
