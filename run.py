@@ -4,7 +4,7 @@ from regex import I
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from torch.utils.data import DataLoader
 from exp_datasets import StreamingQADataset, WebTextDataset, SquadDataset, ArchivalQADataset, RangeSampler
-from weight_model import CaMeLSWeightModel, UniformWeightModel, SSM
+from weight_model import CaMeLSWeightModel, UniformWeightModel, SSM, TFIDF
 from util import set_seed, CACHE_DIR, debug_memory, create_colored_text
 import csv
 from subroutines import qa_eval, weighted_train, qa_ppl_eval, qa_light_tune_early_stop, get_optimizer
@@ -322,6 +322,13 @@ def evaluate(args):
             weight_model =  UniformWeightModel(args, device_=DEVICE)
         elif args.model_type == 'ssm':
             weight_model = SSM(tokenizer=args.tokenizer_name, device_=DEVICE)
+        elif args.model_type == 'TFIDF':
+            dataset_args = {
+                'streamingqa_path': args.streamingqa_data_path,
+                'archivalqa_path': args.archivalqa_data_path,
+                'squad_splits': args.squad_splits,
+            }
+            weight_model = TFIDF(args.dataset, dataset_args, device_=DEVICE, )
         else:
             raise NameError('Unknown model type')
             

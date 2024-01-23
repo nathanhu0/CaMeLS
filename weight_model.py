@@ -14,6 +14,8 @@ import torch.nn.functional as f
 from omegaconf import OmegaConf
 import pandas as pd
 import spacy
+from datasets import load_dataset
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 
 default_config = OmegaConf.create({
@@ -76,12 +78,10 @@ class WeightingModel(nn.Module):
             for _ in range(self.num_inner_steps):
                 if sequential_update:
                     for i in range(len(batch['text_ids'])):
-                        loss = weighted_lm_loss(f_base_lm, batch['text_ids'][i:i+1],targets[i:i+1],
-                                        batch['text_attention'][i:i+1],weights[i:i+1])
+                        loss = weighted_lm_loss(f_base_lm, batch['text_ids'][i:i+1],targets[i:i+1], batch['text_attention'][i:i+1],weights[i:i+1])
                         diffopt.step(loss)
                 else:
-                    loss = weighted_lm_loss(f_base_lm, batch['text_ids'],targets,
-                                            batch['text_attention'],weights)
+                    loss = weighted_lm_loss(f_base_lm, batch['text_ids'],targets, batch['text_attention'],weights)
                     diffopt.step(loss)
             return f_base_lm, weights
     
@@ -93,21 +93,17 @@ class WeightingModel(nn.Module):
         text_labels[update_batch['text_attention']!=1] = -100
 
         with torch.no_grad():
-            init_text_loss = base_lm(input_ids = update_batch['text_ids'], attention_mask = update_batch['text_attention'], 
-                labels = text_labels).loss
-            init_qa_outputs = base_lm(input_ids = update_batch['qa_ids'], attention_mask = update_batch['qa_attention'], 
-                labels = update_batch['qa_target_ids'])
+            init_text_loss = base_lm(input_ids = update_batch['text_ids'], attention_mask = update_batch['text_attention'], labels = text_labels).loss
+            init_qa_outputs = base_lm(input_ids = update_batch['qa_ids'], attention_mask = update_batch['qa_attention'], labels = update_batch['qa_target_ids'])
                 
         updated_lm, weights = self.get_updated_model(update_batch, base_lm, higher_grad = train, sequential_update = sequential_update)
         
         #new line i pray doesn't make everything crash
         updated_lm.eval()
-        qa_loss = updated_lm(input_ids = update_batch['qa_ids'], attention_mask = update_batch['qa_attention'], 
-                                                        labels = update_batch['qa_target_ids']).loss
+        qa_loss = updated_lm(input_ids = update_batch['qa_ids'], attention_mask = update_batch['qa_attention'], labels = update_batch['qa_target_ids']).loss
         
         with torch.no_grad():
-            final_text_loss = updated_lm(input_ids = update_batch['text_ids'], attention_mask = update_batch['text_attention'], 
-                labels = text_labels).loss
+            final_text_loss = updated_lm(input_ids = update_batch['text_ids'], attention_mask = update_batch['text_attention'], labels = text_labels).loss
 
             
         metrics = {'text_loss': final_text_loss.item(),
@@ -120,7 +116,6 @@ class WeightingModel(nn.Module):
         
         #add aditional terms
         if self.c_kl!=0:
-            l_kl = []
             for name, loc_batch in loc_batches.items():
                 loc_text_labels = loc_batch['loc_ids'].clone()
                 loc_text_labels[loc_batch['loc_attention']!=1] = -100
@@ -326,7 +321,7 @@ class UniformWeightModel(WeightingModel):
                 lr=outer_lr
             )
     def validate(self, val_dataloader, loc_dataloader = None):
-        metrics = super().validate(val_dataloader, loc_dataloader = None)
+        metrics = super().validate(val_dataloader, loc_dataloader = loc_dataloader)
         metrics['scalar'] = self.scalar.item()
         return metrics
 
@@ -354,4 +349,71 @@ class SSM(WeightingModel):
             weights = np.concatenate((named_ents, padding))
             batch_weights.append(weights)
         return torch.tensor(batch_weights).to(self.device)
-    
+
+class TFIDF(WeightingModel):
+    def __init__(self, dataset, dataset_args, tokenizer='gpt2', device_=None, min_threshold = None):
+        super().__init__(device_=device_)
+        if isinstance(tokenizer, str):
+            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
+        else:   
+            self.tokenizer = tokenizer
+        if dataset == 'streamingqa':
+            self.fit_data = list(pd.read_csv(dataset_args['streamingqa_path'])['text'].unique())
+        elif dataset == 'squad':
+            squad_ds = load_dataset('squad', cache_dir=CACHE_DIR)
+            self.fit_data = []
+            for split in dataset_args['squad_splits']:
+                self.fit_data += list(squad_ds[split]['context'])
+            self.fit_data = list(set(self.fit_data))
+
+        elif dataset == 'archivalqa':
+            self.fit_data = list(pd.read_csv(dataset_args['archivalqa_path'])['ans_paragraph'].unique())
+        self.tfidf = TfidfVectorizer()
+        self.tfidf.fit(self.fit_data)
+        self.doc_tokenizer = self.tfidf.build_analyzer()
+        self.doc_preprocesser = self.tfidf.build_preprocessor()
+        self.feature_names = self.tfidf.get_feature_names_out()
+        if min_threshold is not None:
+            arr = self.tfidf.transform(self.fit_data).toarray()
+            non_zero_tfidf = arr[arr!=0]
+            self.min_thresh = np.quantile(non_zero_tfidf, min_threshold)
+        else:
+            self.min_thresh = 0
+    def forward(self, x, attention_mask, idx=None):
+        batch_weights = []
+        for i in range(len(x)):
+            tfidf_weights = self.process_single_seq(x[i][attention_mask[i]==1])
+            padding = [0]*(len(x[i]) - len(tfidf_weights))
+            weights = np.concatenate((tfidf_weights, padding))
+            batch_weights.append(weights)
+        batch_weights = torch.tensor(batch_weights).to(self.device)
+        return batch_weights*(batch_weights > self.min_thresh)
+    def process_single_seq(self, tokens):
+        #reconstruct text from tokens
+        text_by_toks = [self.tokenizer.decode(t, clean_up_tokenization_spaces=False) for t in tokens]
+        text= ''.join(text_by_toks)
+        #apply TFIDF to text
+        pre_processed_doc = self.doc_preprocesser(text)
+        assert len(pre_processed_doc) == len(text)
+        word_splits = self.doc_tokenizer(pre_processed_doc)
+        results = self.tfidf.transform([pre_processed_doc]).toarray()
+        #convert from sparse matrix to dict
+        word_to_tfidf = {}
+        for j, term in enumerate(self.feature_names):
+            tfidf_value = results[0, j]
+            if tfidf_value > 0:
+                word_to_tfidf[term] = tfidf_value
+                
+        #map TFIDF to characters
+        per_char_tf_idf = np.zeros(len(pre_processed_doc))
+        cur_idx = 0
+        for word in word_splits:
+            word_start = pre_processed_doc.find(word, cur_idx)
+            new_end = word_start + len(word)
+            if word in word_to_tfidf:
+                per_char_tf_idf[word_start:new_end] = word_to_tfidf[word]
+            cur_idx = new_end
+            
+        tok_lens = [len(t) for t in text_by_toks]
+        prefix_sum = np.cumsum(tok_lens, dtype=np.int32)
+        return [max(per_char_tf_idf[prefix_len-tok_len:prefix_len]) for tok_len,prefix_len in zip(tok_lens, prefix_sum)]

@@ -1,0 +1,9 @@
+# @package _global_
+model_type: 'TFIDF'
+#for each dataset, we use the entire dataset (qa pretraining, qa val, metatrain, meta-val, and meta_test) for computing TDIDF weights
+streamingqa_data_path: '/iris/u/nathu/temporal-LMs/learned_updating/data/streamingqa2018+/all.csv'
+archivalqa_data_path: '/iris/u/nathu/temporal-LMs/learned_updating/data/archivalqa/val_data_resplit/all.csv'
+squad_splits: ['train', 'validation']
+
+#of words (which occur at least once), those with a TFIDF weighting in the bottom min_threshold are set to 0
+min_threshold: 0.00
